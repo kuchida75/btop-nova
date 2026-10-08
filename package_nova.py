@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from audit_release import audit_paths
 
 ROOT = pathlib.Path(__file__).resolve().parent
 
@@ -45,7 +46,7 @@ def dependencies(binary, temporary):
     (metadata/'debian').mkdir(parents=True)
     (metadata/'debian/control').write_text(
         'Source: btop-nova\nSection: utils\nPriority: optional\n'
-        'Maintainer: kuchida75 <153719495+kuchida75@users.noreply.github.com>\n\n'
+        'Maintainer: Nova btop contributors <noreply@github.com>\n\n'
         'Package: btop-nova\nArchitecture: amd64\nDescription: Nova btop resource monitor\n')
     result = run('dpkg-shlibdeps', '-O', '-e'+str(binary), cwd=metadata)
     return next(line.partition('=')[2] for line in result.splitlines() if line.startswith('shlibs:Depends='))
@@ -124,7 +125,7 @@ def package(args):
         size = math.ceil(sum(p.stat().st_size for p in (deb/'usr').rglob('*') if p.is_file() and not p.is_symlink())/1024)
         (deb/'DEBIAN/control').write_text(
             f'Package: btop-nova\nVersion: {deb_version}\nArchitecture: amd64\n'
-            'Maintainer: kuchida75 <153719495+kuchida75@users.noreply.github.com>\n'
+            'Maintainer: Nova btop contributors <noreply@github.com>\n'
             f'Installed-Size: {size}\nDepends: {depends}\nSection: utils\nPriority: optional\n'
             'Homepage: https://github.com/kuchida75/btop-nova\n'
             'Description: Nova btop with disk throughput and fine GPU histories\n'
@@ -155,6 +156,7 @@ def package(args):
             assets=[dict(name=p.name, size=p.stat().st_size, sha256=digest(p)) for p in assets]), indent=2)+'\n')
         assets.append(manifest)
         (output/'SHA256SUMS').write_text(''.join(digest(p)+'  '+p.name+'\n' for p in assets))
+        audit_paths([*assets, output/'SHA256SUMS'])
     print(json.dumps(dict(version=version, depends=depends, output=str(output), assets=[p.name for p in assets]+['SHA256SUMS']), indent=2))
 
 

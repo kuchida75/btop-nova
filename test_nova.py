@@ -9,7 +9,7 @@ root=pathlib.Path(__file__).resolve().parent
 test_config=tempfile.TemporaryDirectory(prefix=".nova-test-config-",dir=root)
 config_dir=pathlib.Path(test_config.name)
 (config_dir/"btop").mkdir()
-original=(root/"nova-config/btop/btop.conf").read_text()
+original=(root/"packaging/default.conf").read_text()
 original=re.sub(r'io_mode = (True|False)', 'io_mode = False', original)
 original=re.sub(r'gpu_always_visible = (True|False)', 'gpu_always_visible = False', original)
 (config_dir/"btop/btop.conf").write_text(original)
@@ -49,7 +49,7 @@ for cols,rows,interval in [(160,60,500),(100,35,500),(80,24,500),(160,60,1000),(
         write_rows=[line for s in snaps for line in s.splitlines() if re.search(r'W [0-9.]+ MiB/s',line)]
         assert any(any('⠁' <= c <= '⣿' for c in line.split('MiB/s',1)[1]) for line in write_rows), 'No live write history'
         if cols==160:
-            assert 'Crucial4TB' in final and 'CrucialMX500' in final, final
+            assert 'R ' in final and 'W ' in final, final
         rates=[float(m.group(1)) for s in snaps if (m:=re.search(r'W ([0-9.]+)',s))]
         assert rates and max(rates)>0, final
         average=sum(rates)/len(rates)

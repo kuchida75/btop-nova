@@ -2,6 +2,10 @@
 set -eu
 checkout=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 export XDG_CONFIG_HOME="$checkout/nova-config"
+mkdir -p "$XDG_CONFIG_HOME/btop"
+if [ ! -f "$XDG_CONFIG_HOME/btop/btop.conf" ]; then
+    cp "$checkout/packaging/default.conf" "$XDG_CONFIG_HOME/btop/btop.conf"
+fi
 # Always open the combined capacity/usage/throughput view.
 sed -i 's/^io_mode = .*/io_mode = False/' "$XDG_CONFIG_HOME/btop/btop.conf"
 # Older running builds may save a config without this new preference.

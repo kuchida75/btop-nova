@@ -9,7 +9,7 @@ root=pathlib.Path(__file__).resolve().parent
 
 test_config=tempfile.TemporaryDirectory(prefix='.nova-read-config-',dir=root)
 config_dir=pathlib.Path(test_config.name)/'btop';config_dir.mkdir()
-config=(root/'nova-config/btop/btop.conf').read_text()
+config=(root/'packaging/default.conf').read_text()
 config=re.sub(r'io_mode = (True|False)', 'io_mode = False', config)
 config=re.sub(r'gpu_always_visible = (True|False)', 'gpu_always_visible = False', config)
 (config_dir/'btop.conf').write_text(config)

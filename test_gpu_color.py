@@ -1,11 +1,11 @@
 """PTY tests for coloured GPU histories, optional NVML process APIs and mount colours.
 All GPU values are synthetic; process metadata and mounts use the actual host.
 """
-import codecs, fcntl, os, pathlib, pty, re, select, struct, subprocess, sys, tempfile, termios, time
+import codecs, fcntl, pwd, os, pathlib, pty, re, select, struct, subprocess, sys, tempfile, termios, time
 sys.path.insert(0, '/tmp/nova-terminal-test')
 import pyte
 root = pathlib.Path(__file__).resolve().parent
-base = (root / 'nova-config/btop/btop.conf').read_text()
+base = (root / 'packaging/default.conf').read_text()
 
 def config_with(**values):
     text = base
@@ -97,7 +97,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-color-', dir=root) as tmp:
             t = Terminal(config_with(**common), tmp, libraries[api], extra)
             try:
                 row = check(t)
-                assert 'kuchida' in t.screen.display[row], t.text()
+                assert pwd.getpwuid(os.getuid()).pw_name in t.screen.display[row], t.text()
                 assert 'CPU%' in t.text() and 'RSS' in t.text(), t.text()
                 if api != 'v3':
                     print(api + ': typed process API, duplicate merge and metadata passed')
@@ -113,8 +113,9 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-color-', dir=root) as tmp:
                 efi = find_line(t, '/boot/efi')
                 assert colour_at(t, efi, '/boot/efi') == '6ba8ff'
                 assert any(c.fg == '52c878' for c in t.screen.buffer[efi].values())
-                disk = find_line(t, '/mnt/Crucial4TB')
-                assert any(c.fg == 'ffcd4b' for c in t.screen.buffer[disk].values()), t.text()
+                # The mount usage palette is tested with host-independent
+                # synthetic sizes in tests/nova_mounts.cpp.
+                assert any(c.fg == 'ffcd4b' for c in t.screen.buffer[table].values()), t.text()
                 # Check the plot itself, not merely coloured legend text.
                 separator = find_line(t, 'GPU processes ')
                 plot_colours = {c.fg for r in range(gpu_row+1, separator-1) for x,c in t.screen.buffer[r].items() if x < 134 and len(c.data) == 1 and 0x2801 <= ord(c.data) <= 0x28ff}

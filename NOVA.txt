@@ -17,7 +17,7 @@ grows from 21 to 28. The seven additional rows go to the plot above its process
 table. With 32 logical CPU graphs enabled, CPU uses 18 rows and GPU uses 24.
 
 The mount table now spans the entire bottom width beneath memory, network and
-processes. Its wider usage bars fill the available space, while all five Nova
+processes. Its wider usage bars fill the available space, while local
 mountpoints and complete device paths fit at 146 columns or wider. CPU-bottom
 presets keep CPU/GPU together below the body, with mounts at the body's bottom.
 The table remains tied to the process view and is hidden if PROC is disabled.
@@ -62,9 +62,8 @@ Missing or malformed statistics show -- rather than a fabricated zero or ratio.
 Known-idle swap devices stay hidden even when compression counters cannot be
 read. Devices with unknown activity retain the unavailable-data summary.
 
-Nova has zram0 using zstd, with approximately 59.4 GiB of logical capacity.
-Its footer is hidden whenever no swap pages are in use. That capacity is not
-RAM preallocated for compressed payload. The footer is useful under memory pressure:
+The footer is hidden whenever no swap pages are in use. Logical zram capacity
+is not RAM preallocated for compressed payload. The footer is useful under memory pressure:
 actual stored data, compressed size and allocation cost show its effectiveness.
 The original RAM figures already account for this allocation; Save should not
 be added to the displayed Available value.
@@ -84,8 +83,7 @@ Options > CPU > cpu_logical_graphs also controls this preference.
 If all processors cannot fit with readable labels and at least one graph row,
 the panel automatically uses a single total CPU graph. Enlarging the window
 restores the grid, without changing the saved preference. Disabling the option
-restores the previous upper/lower CPU graph settings. Nova has 32 logical
-processors. The custom configuration enables this optional view initially;
+restores the previous upper/lower CPU graph settings. The portable configuration enables this optional view initially;
 subsequent choices persist across launches and upgrades.
 
 Mounted filesystem table (Linux):
@@ -211,16 +209,13 @@ Then open a new Bash terminal, or run: unalias btop; hash -r
 Rollback removes only this command and its marked alias. Releases, configuration
 and backups remain available. It preserves later changes to ~/.bashrc.
 
-Nova currently has root, /mnt/Crucial4TB and /mnt/CrucialMX500 selected.
-The T705 is unmounted: no filesystem capacity usage can be shown for it.
-After mounting it yourself, add its actual mountpoint to disks_filter in
-nova-config/btop/btop.conf and, if appropriate, disable use_fstab there.
-This change does not mount filesystems or modify fstab.
+Release disk filters are empty so local filesystems are discovered at runtime.
+For a selected subset, set disks_filter to your mountpoints in the isolated
+profile. This build does not mount filesystems or modify fstab.
 
 Build: make -j2 QUIET=true
-Originally validated with GCC 13.3; io6 through io9 were rebuilt with GCC 15.2
-on the upgraded Ubuntu 26.04.1 host and GNU Make 4.4.1; GPU support is preserved using
-upstream dynamic loading. No system dependencies or packages were installed.
+The release was built with GCC 15.2 and GNU Make 4.4.1. GPU support uses
+upstream dynamic loading. Library requirements are recorded in the manifest.
 Compiler warnings about dangling references originate in upstream code.
 
 Regression check: test_nova.py uses pyte to drive a real terminal and compare
@@ -250,19 +245,24 @@ independently. It also covers missing sensors, pinning, four presets, CPU
 bottom placement, legacy toggling, help redraw, resizing, and all native
 symbols in a narrow GPU-only panel. The fixture stays inside a temporary
 test directory and is never installed. Results: test-gpu-boot-results.txt.
-Real RTX 5090 readings use the existing NVIDIA NVML collector; this terminal
+Real hardware readings use the existing NVIDIA NVML collector; this terminal
 sandbox cannot access the GPU device, so hardware readings need checking in
 the user's normal terminal after restart.
 Preset tests also exposed upstream temporary string-view keys in deferred
 configuration changes and invalid GPU preset graph keys. Both are corrected.
 
-No GitHub publication has been performed. The branch and local commits are
-ready for the user's hardware check before choosing a fork destination.
+Public source and release downloads: https://github.com/kuchida75/btop-nova
+
+[AI generated] Nova modifications, tests, packaging and documentation include
+AI-generated content. Upstream code and third-party notices retain their
+original attribution. Release defaults and tests contain no saved host profile;
+integration tests discover local values at runtime. The bundled GPU preview
+contains simulated data and no real process identities.
 
 Mount table validation: tests/nova_mounts.cpp checks escaped mount paths,
 control-character display, bind/loop exclusion, deduplication, Btrfs/ZFS,
-column bounds and process-space limits. test_mounts.py compares all five
-Nova filesystems and raw byte counts against installed duf, verifies that
+column bounds and process-space limits. test_mounts.py compares collected local
+filesystems and raw byte counts against installed duf, verifies that
 newly allocated blocks are reflected, and drives a real terminal through
 process selection, details, scrolling, filtering, tree view, help, Shift+M,
 resizing, automatic fallback/restoration and presets with the GPU pinned.
@@ -279,7 +279,7 @@ host CPU/RSS, unknown identities, stale/unavailable samples, partial lists,
 process creation races, truncation, distinct plot/legend colours, mount colours,
 TTY/256-colour fallbacks, toggles, resizing, presets, help and persistence.
 The GPU preview is explicitly labelled synthetic; host mount values are real.
-Results: test-gpu-color-results.txt. Physical RTX 5090 comparison with nvtop
+Results: test-gpu-color-results.txt. Physical GPU comparison with nvtop
 remains a normal-terminal check because the sandbox cannot access GPU devices.
 test_gpu_dots.py renders a dense four-colour simulated history, checks both
 dot columns, inherited TTY symbols and small-window restoration, and exports

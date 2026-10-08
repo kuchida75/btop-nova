@@ -7,7 +7,7 @@ import codecs, fcntl, os, pathlib, pty, re, select, struct, subprocess, sys, tem
 sys.path.insert(0, '/tmp/nova-terminal-test')
 import pyte
 root = pathlib.Path(__file__).resolve().parent
-base = (root / 'nova-config/btop/btop.conf').read_text()
+base = (root / 'packaging/default.conf').read_text()
 
 def config_with(**values):
     text = base
@@ -73,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-boot-', dir=root) as tmp:
         assert not has_disk(t, 'boot') and not has_disk(t, 'efi'), t.text()
         t.key('B'); t.drain(.6)
         assert has_disk(t, 'boot') and has_disk(t, 'efi'), t.text()
-        assert has_disk(t, 'Crucial4TB') and has_disk(t, 'CrucialMX500'), t.text()
+        assert has_disk(t, 'root'), t.text()
         assert t.text().count('MiB/s') >= 10, t.text()
         (root / 'test-screen-gpu-boot-200x100.txt').write_text(t.text())
         t.key('B')

@@ -3,7 +3,7 @@ import codecs, fcntl, json, os, pathlib, pty, re, select, struct, subprocess, sy
 sys.path.insert(0, '/tmp/nova-terminal-test')
 import pyte
 root = pathlib.Path(__file__).resolve().parent
-base = (root / 'nova-config/btop/btop.conf').read_text()
+base = (root / 'packaging/default.conf').read_text()
 for key, value in [('nova_layout', 'False'), ('gpu_nvtop_graph', 'False'), ('gpu_processes', 'False'), ('io_mode', 'False'), ('proc_mounts', 'True'), ('gpu_always_visible', 'False'), ('show_boot_disks', 'False'), ('update_ms', '500')]:
     base = re.sub(r'^' + key + r'\s*=.*$', key + ' = ' + value, base, flags=re.M)
 
@@ -57,13 +57,14 @@ def collected():
 
 rows = collected()
 duf = {r['mount_point']: r for r in json.loads(subprocess.check_output(['duf', '--json'], text=True))}
-assert set(rows) == {'/', '/boot', '/boot/efi', '/mnt/Crucial4TB', '/mnt/CrucialMX500'}, rows
+assert '/' in rows and set(rows) <= set(duf), rows
+mount_title = f'mounts {len(rows)} local'
 for path, (total, used, available, kind, device) in rows.items():
     expected = duf[path]
     assert total == expected['total'] and kind == expected['fs_type']
     assert abs(used - expected['used']) < 8 * 1024**2
     assert abs(available - expected['free']) < 8 * 1024**2
-print('All five local filesystems and byte values agree with installed duf; binds, loops and pseudo filesystems excluded', flush=True)
+print('Collected local filesystems and byte values agree with installed duf; binds, loops and pseudo filesystems excluded', flush=True)
 
 # A fresh collection responds to actual allocation on the root filesystem.
 with tempfile.NamedTemporaryFile(prefix='.nova-mount-allocation-', dir=root) as allocation:
@@ -83,16 +84,16 @@ try:
         try:
             t.drain(1)
             assert 'MOUNTED ON' in t.text() and 'FILESYSTEM' in t.text(), t.text()
-            assert 'mounts 5 local' in t.text(), t.text()
+            assert mount_title in t.text(), t.text()
             header = next(i for i, line in enumerate(t.screen.display) if 'MOUNTED ON' in line)
-            table = t.screen.display[header+2:header+7]
+            table = t.screen.display[header+2:header+2+len(rows)]
             for mount in rows: assert any(mount in line for line in table), t.text()
-            for mount in ('/', '/boot', '/boot/efi'):
+            for mount in rows:
                 line = next(line for line in table if re.search(r'│' + re.escape(mount) + r'\s*│', line))
                 percent = float(re.search(r'([0-9.]+)%', line).group(1))
                 expected = rows[mount][1] * 100 / rows[mount][0]
                 assert abs(percent - expected) < .2, (mount, percent, expected)
-            assert any('ntfs3' in line for line in table), table
+            assert all(any(kind in line for line in table) for _,_,_,kind,_ in rows.values()), table
             assert all('[' in line and '#' in line or '[..........]' in line for line in table), table
             proc_top = next(i for i, line in enumerate(t.screen.display) if '⁴proc' in line)
             proc_col = t.screen.display[proc_top].index('╭', t.screen.display[proc_top].index('⁴proc')-6)
@@ -133,7 +134,7 @@ try:
             assert 'Status:' in t.text() and 'MOUNTED ON' not in t.text(), t.text()
             t.key(b'\r'); assert 'MOUNTED ON' in t.text(), t.text()
             t.resize(80, 24); assert 'MOUNTED ON' not in t.text(), t.text()
-            t.resize(200, 80); assert 'mounts 5 local' in t.text(), t.text()
+            t.resize(200, 80); assert mount_title in t.text(), t.text()
             t.key(b'p'); assert 'MOUNTED ON' in t.text(), t.text()
         finally: t.close()
         assert 'proc_mounts = True' in t.conf.read_text()
@@ -143,7 +144,7 @@ try:
         subprocess.run(['gcc', '-shared', '-fPIC', str(root / 'tests/nova_nvml_fixture.c'), '-o', str(library / 'libnvidia-ml.so')], check=True)
         t = Terminal(base.replace('gpu_always_visible = False', 'gpu_always_visible = True'), tmp, height=100, extra={'LD_LIBRARY_PATH': str(library)})
         try:
-            assert 'GPU load ' in t.text() and 'VRAM used ' in t.text() and 'mounts 5 local' in t.text(), t.text()
+            assert 'GPU load ' in t.text() and 'VRAM used ' in t.text() and mount_title in t.text(), t.text()
             for _ in range(3):
                 t.key(b'p'); assert 'GPU load ' in t.text(), t.text()
                 if '⁴proc' in t.text(): assert 'MOUNTED ON' in t.text(), t.text()

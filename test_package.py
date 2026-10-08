@@ -7,6 +7,7 @@ import re
 import subprocess
 import tarfile
 import tempfile
+from audit_release import audit_paths
 
 root = pathlib.Path(__file__).resolve().parent
 dist = root/'dist'
@@ -31,6 +32,7 @@ assert manifest['binary_sha256'] == digest(root/'bin/btop')
 deb = next(dist/item['name'] for item in manifest['assets'] if item['name'].endswith('.deb'))
 portable = next(dist/item['name'] for item in manifest['assets'] if item['name'].endswith('amd64.tar.gz'))
 source = next(dist/item['name'] for item in manifest['assets'] if item['name'].endswith('source.tar.gz'))
+audit_paths([portable, deb, source, dist/'release-manifest.json', dist/'SHA256SUMS'])
 
 with tempfile.TemporaryDirectory(prefix='.nova-package-test-', dir=root) as tmp:
     tmp = pathlib.Path(tmp)

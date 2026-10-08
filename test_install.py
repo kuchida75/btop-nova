@@ -2,7 +2,7 @@
 import hashlib, json, pathlib, re, subprocess, sys, tempfile
 root = pathlib.Path(__file__).resolve().parent
 installed_config = pathlib.Path.home()/'.local/share/btop-nova/config/btop/btop.conf'
-old = installed_config.read_text()
+old = (root/'packaging/default.conf').read_text()
 # Recreate an older profile even after the user's real installation is upgraded.
 old = re.sub(r'^(nova_layout|show_zram)\s*=.*\n?', '', old, flags=re.M)
 for key in ('show_swap', 'swap_disk'):
@@ -21,14 +21,14 @@ with tempfile.TemporaryDirectory(prefix='.nova-install-', dir=root) as tmp:
         output = subprocess.check_output([sys.executable, str(root/'install_nova.py'), '--prefix', str(prefix), '--bashrc', str(bashrc)], text=True)
         return json.loads(output)
     manifest = install()
-    assert manifest['version'] == '1.3.0-nova-io9', manifest
+    assert manifest['version'] == '1.3.0-nova-io10', manifest
     new = values(conf.read_text()); original = values(old)
     for key, value in original.items():
         assert new[key] == ('False' if key in ('show_swap', 'swap_disk') else value), (key, value, new[key])
     assert new['nova_layout'] == 'True' and new['show_zram'] == 'True'
     assert new['cpu_logical_graphs'] == original['cpu_logical_graphs']
     command = prefix/'bin/btop'
-    assert '1.3.0-nova-io9' in subprocess.check_output([str(command), '--version'], text=True)
+    assert '1.3.0-nova-io10' in subprocess.check_output([str(command), '--version'], text=True)
     assert values(conf.read_text())['io_mode'] == 'False'
     shell_hash = digest(bashrc)
     release = pathlib.Path(manifest['release'])/'bin/btop'
@@ -55,4 +55,4 @@ with tempfile.TemporaryDirectory(prefix='.nova-install-', dir=root) as tmp:
     subprocess.check_call([str(command), '--version'], stdout=subprocess.DEVNULL)
     assert values(conf.read_text())['show_zram'] == 'True'
 assert {str(path): digest(path) for path in protected} == before
-print('io6/io7/io8 → io9 upgrade preserves CPU/GPU/mount and zram preferences; one-time layout migration, wrapper recovery and protected system files passed')
+print('Older profile → current release upgrade preserves CPU/GPU/mount and zram preferences; one-time layout migration, wrapper recovery and protected system files passed')

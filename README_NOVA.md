@@ -1,7 +1,20 @@
 # Nova btop
 
 A Linux fork of [aristocratos/btop](https://github.com/aristocratos/btop), based
-on upstream v1.3.0. Current Nova version: **1.3.0-nova-io9**.
+on upstream v1.3.0. Current Nova version: **1.3.0-nova-io10**.
+
+## AI disclosure and release privacy
+
+**[AI generated]** Nova modifications, tests, packaging and documentation
+include AI-generated content. Validation is described below; this disclosure
+does not imply that upstream btop code was AI-generated. Any contribution back
+to upstream must follow its current contributing guidelines.
+
+Release defaults are generic. Packages exclude local profiles, usernames,
+hostnames, private contact details, mount labels and runtime logs. The bundled
+preview uses simulated data. Public repository links and required upstream
+contributor/licence attribution remain. Run `python3 audit_release.py` to inspect
+the built archives before upload.
 
 ## Added displays
 
@@ -45,8 +58,8 @@ sha256sum --ignore-missing -c SHA256SUMS
 ### Portable user installation (recommended on the existing Nova host)
 
 ```sh
-tar -xzf btop-nova-1.3.0-nova-io9-linux-amd64.tar.gz
-cd btop-nova-1.3.0-nova-io9-linux-amd64
+tar -xzf btop-nova-1.3.0-nova-io10-linux-amd64.tar.gz
+cd btop-nova-1.3.0-nova-io10-linux-amd64
 python3 install_nova.py
 ~/.local/bin/btop
 ```

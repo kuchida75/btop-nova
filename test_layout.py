@@ -2,6 +2,9 @@
 import os, pathlib, re, subprocess, sys, tempfile
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "tests"))
 from nova_terminal import Terminal, config_with, root
+from nova_host import mounted_filesystems
+mounts = mounted_filesystems()
+mount_title = f'mounts {len(mounts)} local'
 
 def row(term, token):
     result = next((i for i, line in enumerate(term.screen.display) if token in line), -1)
@@ -13,14 +16,14 @@ def boundaries(term):
 
 def full_mounts(term):
     (root / 'test-screen-layout-latest.txt').write_text(term.text())
-    title = row(term, 'mounts 5 local')
+    title = row(term, mount_title)
     assert term.screen.display[title].index('mounts ') < 5, term.text()
-    assert title == term.screen.lines - 9, term.text()
+    assert title == term.screen.lines - len(mounts) - 4, term.text()
     for token in ('MOUNTED ON', 'SIZE', 'USED', 'AVAIL', 'USE%', 'TYPE', 'FILESYSTEM'):
         assert token in term.screen.display[title + 1], term.text()
-    for path in ('/boot', '/boot/efi', '/mnt/Crucial4TB', '/mnt/CrucialMX500'):
+    for path in mounts:
         assert path in term.text(), term.text()
-    assert '/dev/mapper/ubuntu--vg-ubuntu--lv' in term.text(), term.text()
+    assert mounts['/']['device'] in term.text(), term.text()
     assert 'binary | Shift+M hide' in term.screen.display[-1], term.text()
     assert 'Swap:' not in term.text(), term.text()
     assert row(term, '³net') < title and row(term, '⁴proc') < title
@@ -36,7 +39,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-layout-', dir=root) as tmp:
     baseline = Terminal(config_with(**common, nova_layout='False', show_swap='True'), tmp, library)
     try:
         old = boundaries(baseline)
-        old_table = row(baseline, 'mounts 5 local')
+        old_table = row(baseline, mount_title)
         old_network_height = baseline.screen.lines - old['net']
         (root / 'test-screen-layout-before.txt').write_text(baseline.text())
     finally: baseline.close()
@@ -50,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-layout-', dir=root) as tmp:
         assert new['net'] < old['net'], (new, old)
         assert bottom - new['net'] >= old_network_height, (new, old)
         assert 'GPU processes ' in term.text() and 'GCLK ' in term.text()
-        assert 'CrucialMX500' in '\n'.join(term.screen.display[new['mem']:bottom]), term.text()
+        assert 'MiB/s' in '\n'.join(term.screen.display[new['mem']:bottom]), term.text()
         assert 'Free:' in '\n'.join(term.screen.display[new['mem']:new['net']]), term.text()
         print(f'200x100: CPU {old["gpu"]} → {new["gpu"]} rows; GPU {old["mem"]-old["gpu"]} → {new["mem"]-new["gpu"]}; network starts {old["net"]+1} → {new["net"]+1}; full-width table shows all device paths', flush=True)
         term.drain(3)
@@ -59,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-layout-', dir=root) as tmp:
         font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf', 13)
         preview = Image.new('RGB', (1600, (term.screen.lines+3)*17), '#101218')
         draw = ImageDraw.Draw(preview)
-        draw.text((8, 4), 'Nova io9 layout — synthetic GPU readings; actual Nova mounts; idle zram hidden', font=font, fill='white')
+        draw.text((8, 4), 'Nova io9 layout — synthetic GPU readings; local mounted filesystems; idle zram hidden', font=font, fill='white')
         for line in range(term.screen.lines):
             for col in range(term.screen.columns):
                 cell = term.screen.buffer[line][col]
@@ -125,7 +128,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-layout-', dir=root) as tmp:
             if 'proc' not in alternate.get('shown_boxes', 'proc'): assert 'MOUNTED ON' not in text, text
             elif alternate.get('cpu_bottom') == 'True':
                 assert row(term, 'MOUNTED ON') < row(term, '⁵gpu0') < row(term, '¹cpu'), text
-                assert '/dev/mapper/ubuntu--vg-ubuntu--lv' in text, text
+                assert mounts['/']['device'] in text, text
             else: full_mounts(term)
         finally: term.close()
     print('Process-left, network-above-memory, CPU-bottom, CPU-hidden and process-hidden layouts passed', flush=True)

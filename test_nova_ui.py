@@ -5,7 +5,7 @@ import pyte
 root=pathlib.Path(__file__).resolve().parent
 with tempfile.TemporaryDirectory(prefix='.nova-ui-',dir=root) as tmp:
     config=pathlib.Path(tmp)/'btop';config.mkdir();conf=config/'btop.conf'
-    original=(root/'nova-config/btop/btop.conf').read_text()
+    original=(root/'packaging/default.conf').read_text()
     original=re.sub(r'io_mode = (True|False)','io_mode = False',original)
     # Also exercise speeds above 2047 MiB/s, which overflowed the upstream int shift.
     original=re.sub(r'io_graph_speeds = ".*"','io_graph_speeds = "/:10000"',original)

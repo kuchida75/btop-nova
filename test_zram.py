@@ -26,7 +26,7 @@ def check(term, decimal=False, data=None):
     saved = data[0]-data[2]
     assert 'RAM '+size(data[2], decimal)+' Save '+('-' if saved < 0 else '')+size(abs(saved), decimal) in term.screen.display[zram+2], text
     assert zram == row(term, '³net')-4, text
-    assert 'Swap:' not in text and 'CrucialMX500' in text, text
+    assert 'Swap:' not in text and 'MiB/s' in text, text
     mem = row(term, '²mem')
     for metric in ('Total:', 'Used:', 'Available:', 'Cached:', 'Free:'):
         assert metric in '\n'.join(term.screen.display[mem:zram]), (metric, text)
@@ -83,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-zram-', dir=root) as tmp:
     extra = dict(LD_PRELOAD=str(shim), NOVA_TEST_ZRAM_FILES=str(fixture))
     def counters(active=True, unknown=False):
         values = 'unavailable' if unknown else '4294967296 1073741824 1207959552 0 0 0 0 0 0' if active else '4096 59 20480 0 20480 0 0 0 0'
-        for name, text in {'mm_stat':values+'\n', 'swaps':'Filename Type Size Used Priority\n/dev/zram0 partition 62286956 '+('4194304' if active else '0')+' 100\n/swap.img file 8388604 0 -1\n'}.items():
+        for name, text in {'mm_stat':values+'\n', 'swaps':'Filename Type Size Used Priority\n/dev/zram0 partition 8388608 '+('4194304' if active else '0')+' 100\n/swap.img file 8388604 0 -1\n'}.items():
             staged = fixture/(name+'.tmp'); staged.write_text(text); staged.replace(fixture/name)
     for symbol in ('braille', 'block', 'tty'):
         counters()
