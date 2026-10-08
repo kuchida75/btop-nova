@@ -18,6 +18,8 @@ tab-size = 4
 
 #pragma once
 
+#include "btop_gpu_history.hpp"
+#include "btop_zram.hpp"
 #include <array>
 #include <atomic>
 #include <deque>
@@ -102,11 +104,15 @@ namespace Gpu {
 
   const array mem_names { "used"s, "free"s };
 
-	//* Container for process information // TODO
-	/*struct proc_info {
-    unsigned int pid;
-    unsigned long long mem;
-	};*/
+	struct gpu_process {
+		unsigned int pid{};
+		bool graphics{}, compute{};
+		long long memory = -1; // NVML allocation in bytes, -- when unavailable
+		int utilization = -1; // SM percentage, -- when unavailable
+		string user = "--", command = "--";
+		double cpu = -1; // percent of one logical processor
+		long long host_memory = -1; // resident bytes
+	};
 
 	//* Container for supported Gpu::*::collect() functions
 	struct gpu_info_supported {
@@ -129,7 +135,7 @@ namespace Gpu {
 			{"gpu-vram-totals", {}},
 			{"gpu-pwr-totals", {}},
 		};
-		unsigned int gpu_clock_speed; // MHz
+		unsigned int gpu_clock_speed{}; // MHz
 
 		long long pwr_usage; // mW
 		long long pwr_max_usage = 255000;
@@ -148,8 +154,12 @@ namespace Gpu {
 
 		gpu_info_supported supported_functions;
 
-		// vector<proc_info> graphics_processes = {}; // TODO
-		// vector<proc_info> compute_processes = {};
+		unsigned int gpu_clock_max{}, mem_clock_max{};
+		bool gpu_clock_valid{}, mem_clock_valid{};
+		deque<GpuHistory::Sample> history;
+		vector<gpu_process> processes;
+		bool graphics_processes_available{}, compute_processes_available{};
+
 	};
 
 	namespace Nvml {
@@ -235,6 +245,10 @@ namespace Mem {
 		int used_percent{};
 		int free_percent{};
 
+		double throughput_sample_time{};
+		double read_mib{}, write_mib{};
+		bool throughput_valid{};
+
 		array<int64_t, 3> old_io = {0, 0, 0};
 		deque<long long> io_read = {};
 		deque<long long> io_write = {};
@@ -242,6 +256,7 @@ namespace Mem {
 	};
 
 	struct mem_info {
+		Zram::Snapshot zram;
 		std::unordered_map<string, uint64_t> stats =
 			{{"used", 0}, {"available", 0}, {"cached", 0}, {"free", 0},
 			{"swap_total", 0}, {"swap_used", 0}, {"swap_free", 0}};
@@ -304,7 +319,8 @@ namespace Proc {
 	extern string box;
 	extern int x, y, width, height, min_width, min_height;
 	extern bool shown, redraw;
-	extern int select_max;
+	extern int select_max, list_height;
+	void update_layout(bool force = false);
 	extern atomic<int> detailed_pid;
 	extern int selected_pid, start, selected, collapse, expand, filter_found, selected_depth;
 	extern string selected_name;

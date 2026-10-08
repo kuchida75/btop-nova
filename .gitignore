@@ -82,3 +82,39 @@ _deps
 
 # CLion
 cmake-build-*
+
+# Nova local runtime and verification artifacts
+!nova-config/btop/
+!nova-config/btop/btop.conf
+nova-config/btop/btop.log
+build-nova.log
+test-screen-*.txt
+test-results.txt
+.nova-test-io
+
+production-stage/
+__pycache__/
+test-ui-results.txt
+nova-disks-preview.png
+
+test-read-final.txt
+
+test-cpu-results.txt
+nova-cpu-grid-preview.png
+
+test-gpu-boot-results.txt
+nova-gpu-boot-preview.png
+
+test-mounts-results.txt
+nova-mounts-preview.png
+
+test-gpu-color-results.txt
+nova-gpu-color-preview.png
+test-layout-results.txt
+nova-layout-preview.png
+test-zram-results.txt
+nova-zram-preview.png
+test-gpu-dots-results.txt
+nova-gpu-dots-preview.png
+/dist/
+test-package-results.txt

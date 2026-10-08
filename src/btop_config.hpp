@@ -68,6 +68,9 @@ namespace Config {
 	//* Toggle box and update config string shown_boxes
 	void toggle_box(const string& box);
 
+	//* Keep gpu0 in both the saved layout and the runner box list when pinned.
+	void ensure_gpu_visible();
+
 	//* Parse and setup config value presets
 	bool presetsValid(const string& presets);
 
@@ -106,8 +109,11 @@ namespace Config {
 
 	//* Set config key <name> to string <value>
 	inline void set(const std::string_view name, const string& value) {
-		if (_locked(name)) stringsTmp.insert_or_assign(name, value);
-		else strings.at(name) = value;
+		auto& target = strings.at(name);
+		// Pending keys are string_views. Use the permanent key, since callers
+		// can build a temporary name (e.g. graph_symbol_cpu in a preset).
+		if (_locked(name)) stringsTmp.insert_or_assign(strings.find(name)->first, value);
+		else target = value;
 	}
 
 	//* Flip config key bool <name>

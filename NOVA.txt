@@ -1,0 +1,313 @@
+Nova btop custom build
+
+Base: upstream v1.3.0, commit 36842a3bccfb78f5c27642435bff387b42f7d13b
+Branch: nova/permanent-disk-throughput
+
+Run sh ./launch-nova-btop from this checkout, or pass its absolute path to sh.
+The launcher uses nova-config/btop, separate from ~/.config/btop, and opens
+normal disk mode each time. Press i to toggle the optional I/O-only view.
+
+Nova layout (io7):
+The Nova profile gives GPU histories more height by shortening the aggregate
+CPU panel. It keeps the combined CPU/GPU height unchanged so lower panels do
+not lose space. An enabled logical-processor grid that already fits continues
+to fit; otherwise the existing single-graph fallback remains available.
+At 200 columns by 100 rows, aggregate CPU shrinks from 21 to 14 rows and GPU
+grows from 21 to 28. The seven additional rows go to the plot above its process
+table. With 32 logical CPU graphs enabled, CPU uses 18 rows and GPU uses 24.
+
+The mount table now spans the entire bottom width beneath memory, network and
+processes. Its wider usage bars fill the available space, while all five Nova
+mountpoints and complete device paths fit at 146 columns or wider. CPU-bottom
+presets keep CPU/GPU together below the body, with mounts at the body's bottom.
+The table remains tied to the process view and is hidden if PROC is disabled.
+
+Swap display is hidden once on upgrade to io7. This changes only the display;
+swap remains enabled in Linux. Memory graphs use the released rows correctly,
+and the compact memory panel moves the network section upward. At 200x100 the
+network starts at row 65 instead of 76 and gains two rows despite the new mount
+table. Small layouts keep minimum memory/network heights and hide mounts when
+there is insufficient space. Shift+B can give boot/EFI cards more memory rows.
+
+Options > GENERAL > nova_layout = False restores the previous panel allocation
+and the mount table under processes. Options > MEM > show_swap controls whether
+swap is shown; swap_disk can also display it as a disk. Subsequent upgrades
+preserve these choices and the chosen aggregate/logical CPU view.
+
+To activate a rebuilt release in the existing user installation, close the
+running btop, then run this checkout's install_nova.py with python3 and launch
+~/.local/bin/btop. The installer updates only Nova's versioned user binary and
+isolated configuration. /usr/bin/btop remains the packaged fallback.
+
+Zram compression (io8; idle hiding added in io9, Linux):
+The Nova profile enables a compact three-row footer beneath RAM metrics when
+a zram device has workload data and the panel has sufficient space. It appears
+automatically when used and disappears again when idle, restoring RAM graph
+rows without changing the saved preference. For swap devices, /proc/swaps Used
+distinguishes real workload pages from the tiny nonzero compressed swap header.
+Other initialized zram devices use original data size to determine activity.
+Shift+Z or Options > MEM > show_zram toggles it. Later choices persist across
+upgrades. The footer reuses memory-graph rows; it leaves memory/network panel
+heights and the full-width mount table unchanged. It works with swap hidden.
+
+ZRAM shows the selected algorithm and logical device capacity (cap), summed
+across devices when necessary; mixed algorithms are identified as mixed.
+Data shows uncompressed bytes > compressed bytes, followed by the compression
+ratio. RAM shows the kernel's mem_used_total, including allocator fragmentation
+and metadata overhead. Save is original data minus that reported RAM cost;
+negative values mean allocation overhead exceeds the small stored payload.
+Sizes follow base_10_sizes, using compact B/K/M/G labels to fit the RAM column.
+A zero compressed-size denominator shows --.
+Missing or malformed statistics show -- rather than a fabricated zero or ratio.
+Known-idle swap devices stay hidden even when compression counters cannot be
+read. Devices with unknown activity retain the unavailable-data summary.
+
+Nova has zram0 using zstd, with approximately 59.4 GiB of logical capacity.
+Its footer is hidden whenever no swap pages are in use. That capacity is not
+RAM preallocated for compressed payload. The footer is useful under memory pressure:
+actual stored data, compressed size and allocation cost show its effectiveness.
+The original RAM figures already account for this allocation; Save should not
+be added to the displayed Available value.
+
+The collector only reads /sys/block/zram*/disksize, comp_algorithm and mm_stat
+plus /proc/swaps. No zramctl subprocess, elevated privileges, zram configuration
+changes, writeback, compaction or induced swapping are needed. Kernel ABI:
+https://docs.kernel.org/admin-guide/blockdev/zram.html#stats
+
+Optional logical processor view:
+Shift+L toggles a Windows Task Manager style grid: one 0–100% history for each
+logical processor, labelled CPU0, CPU1, etc. The CPU panel uses the whole width
+for the grid, with model, total load, frequency and temperature above it.
+Uptime and a compact GPU summary (if enabled) remain available below it.
+Options > CPU > cpu_logical_graphs also controls this preference.
+
+If all processors cannot fit with readable labels and at least one graph row,
+the panel automatically uses a single total CPU graph. Enlarging the window
+restores the grid, without changing the saved preference. Disabling the option
+restores the previous upper/lower CPU graph settings. Nova has 32 logical
+processors. The custom configuration enables this optional view initially;
+subsequent choices persist across launches and upgrades.
+
+Mounted filesystem table (Linux):
+The bottom of the body contains a live duf-style table of local
+mounted filesystems. It shows MOUNTED ON, SIZE, USED, AVAIL, a usage bar and
+percentage, plus TYPE and FILESYSTEM/device when the panel is wide enough.
+Paths/devices are blue, headers and metrics use distinct colours, usage bars
+are green below 50%, yellow below 90%, and red at 90% or higher. Available
+space is green at 10 GB or more, yellow below 10 GB, and red below 1 GB.
+TTY and 256-colour terminals receive matching colour fallbacks.
+It reads mountinfo and filesystem statistics directly; no duf subprocess or
+additional runtime dependency is required. Local block filesystems, Btrfs
+subvolumes and ZFS pools are included. Loops, pseudo filesystems, directory
+bind mounts and duplicate filesystem mounts are omitted. Network and FUSE
+mounts are outside the scope of this local-device summary.
+
+Shift+M or Options > PROC > proc_mounts shows/hides the table. Nova enables
+it initially; later choices persist. It includes boot and EFI independently
+of the throughput panel's Shift+B switch and disks_filter. No mount settings
+are changed. Values refresh with the normal btop update interval.
+
+The table takes at most one third of the body and retains at least
+ten process rows. Processes keep their current sorting and scrolling controls.
+At small heights the full process list returns; enlarging restores the table.
+Opening process details can also temporarily hide the table when space is
+limited. Narrow tables retain mountpoint, size, used, available and percentage;
+type and device columns appear at wider sizes. A shown/total count in the title
+identifies omitted rows when there is insufficient height for every mount.
+
+Sizes follow base_10_sizes, with binary/decimal identified in the table footer.
+Like duf, USED counts allocated filesystem blocks and AVAIL excludes reserved
+blocks. On ext4, their sum can be smaller than SIZE because of reserved space.
+This explains why root's used percentage can differ from the older btop disk
+panel, which includes reserved space in used unless disk_free_priv is enabled.
+The mount table never selects processes; process actions stay within the
+shortened list. Device names are shortened from the left when necessary.
+
+Boot and EFI visibility (Linux):
+Shift+B shows/hides mounted /boot and /boot/efi without editing disks_filter.
+Options > MEM > show_boot_disks controls the same saved preference. These
+partitions appear after the data disks and retain capacity, usage and separate
+R/W histories. They are hidden initially. They usually have no activity after
+startup; counters belong to the mounted partitions, not the whole boot drive.
+Resize the terminal if every disk card cannot fit. No files are written to
+boot/EFI as part of testing, and no partitions are mounted by this build.
+
+GPU view:
+Options > GPU > gpu_always_visible keeps gpu0 visible at launch and across
+presets. Nova enables it initially. Disable it to let the 5 key hide gpu0.
+Nova initially enables a live coloured chart: cyan GPU load, yellow VRAM
+occupancy, magenta graphics clock and green memory clock. It uses a fixed
+0-100% axis with newest samples at the right and an elapsed-history label.
+From io9 the chart uses fine Braille dot curves, with two samples horizontally
+and four vertical dot levels per character, instead of whole-character step
+lines. Consecutive readings are connected at dot resolution; unknown readings
+break the curve. The coloured chart uses Braille in Unicode terminals, including
+when native graphs use block symbols; graph_symbol_gpu = "tty" or tty_mode
+selects ASCII dots, as does an inherited general tty symbol. Normal and
+small-window GPU views keep their native symbols.
+History starts empty at launch and fills with real samples; at 500 ms a plot
+of 120 characters covers about 120 seconds. Its time label uses actual sample
+timestamps, including after interval changes and resizing.
+Clock percentages use the maximum clocks reported by the driver; current MHz
+also appears in wider legends. Unknown maximum clocks leave that series --.
+Overlapping dots share one terminal-cell colour, with GPU load and VRAM taking priority.
+Shift+N or Options > GPU > gpu_nvtop_graph enables/disables this chart.
+
+Shift+V selects the previous independent GPU-load / VRAM histogram view and
+turns off the coloured chart. In this previous view, gpu_split_vram toggles
+independent histories or the legacy single/mirrored graph (gpu_mirror_graph).
+Narrow charts automatically use this previous view, restoring the coloured
+chart when widened. VRAM occupancy differs from memory-controller activity in
+the stats box; existing power, temperature, clock and PCIe statistics remain.
+
+A NVIDIA GPU process table appears underneath the chart when height permits.
+Shift+U or Options > GPU > gpu_processes shows/hides it. It merges graphics and
+compute entries by PID (Both), without double-counting their VRAM allocation.
+It sorts by reported GPU activity, then VRAM allocation. PID, type, GPU%, VRAM
+and command are always present; wider windows add user, device, CPU% and RSS.
+CPU% is percent of one logical processor; RSS is resident host memory.
+GPU% is driver-reported SM activity, which may be unavailable for some clients
+or drivers. Missing readings and identities are --; stale activity samples
+expire after three seconds. No GPU accounting mode is enabled or changed.
+A partial-list label identifies a missing graphics or compute API. The list
+retains the whole statistics box, shows up to seven clients, and indicates
+shown/total counts. It hides automatically in short panels and returns after
+resizing. The GPU table is a summary: process selection/actions stay in PROC.
+
+GPU panels stay with the CPU at the bottom when a preset places it there.
+A GPU-only panel requires 60 columns. New chart/process settings are enabled
+once by the Nova installer; later choices persist across launches/upgrades.
+
+Normal disk mode displays name and mounted filesystem capacity, used percent
+and bytes, then separate read (green) and write (red) history graphs with
+current values in binary MiB/s. Larger panels use two rows per graph; smaller
+panels use one-row sparklines. Resize the terminal if lower disks do not fit.
+R and W share an automatic scale based on the visible history, with 25 percent
+headroom and a 64 KiB/s floor. Scale can differ between disks.
+
+All Linux throughput samples now store bytes/second, divided by the measured
+elapsed interval. Normal and I/O-only graph views use these corrected samples,
+including at 500 ms refresh and after pauses. The first sample or unavailable
+counters display --. Idle disks display 0.0. These are block I/O rates for the
+mounted partition/logical device, not application copy speeds; page-cache
+reads and delayed writes can differ. Numeric values round to 0.1 MiB/s when space permits; narrow panels use
+whole values or compact notation to preserve the MiB/s unit.
+show_io_stat controls the extra disk busy-time graphs in I/O-only mode.
+io_graph_speeds sets fixed scales only in I/O-only mode, e.g. "/:10000".
+
+Default-command installation (user account only):
+    python3 install_nova.py
+This installs a versioned copy under ~/.local/share/btop-nova, its isolated
+configuration, a ~/.local/bin/btop wrapper, and a marked btop alias in ~/.bashrc.
+Open a new Bash terminal or run: source ~/.bashrc
+Only the btop command changes. /usr/bin/btop and ~/.config/btop are untouched.
+A Bash-settings backup and installation manifest are saved in that directory.
+An existing unrelated user btop command or alias prevents installation.
+No sudo, package replacement, or general PATH changes are needed.
+
+Fallback: /usr/bin/btop
+Rollback: python3 rollback_nova.py
+Then open a new Bash terminal, or run: unalias btop; hash -r
+Rollback removes only this command and its marked alias. Releases, configuration
+and backups remain available. It preserves later changes to ~/.bashrc.
+
+Nova currently has root, /mnt/Crucial4TB and /mnt/CrucialMX500 selected.
+The T705 is unmounted: no filesystem capacity usage can be shown for it.
+After mounting it yourself, add its actual mountpoint to disks_filter in
+nova-config/btop/btop.conf and, if appropriate, disable use_fstab there.
+This change does not mount filesystems or modify fstab.
+
+Build: make -j2 QUIET=true
+Originally validated with GCC 13.3; io6 through io9 were rebuilt with GCC 15.2
+on the upgraded Ubuntu 26.04.1 host and GNU Make 4.4.1; GPU support is preserved using
+upstream dynamic loading. No system dependencies or packages were installed.
+Compiler warnings about dangling references originate in upstream code.
+
+Regression check: test_nova.py uses pyte to drive a real terminal and compare
+numeric write rates against /sys/dev/block counters at 500/1000/2000 ms.
+It writes and removes one 128 MiB temporary file within this checkout.
+A separate test_nova_read.py verifies direct reads from a 64 MiB temporary
+file against Linux counters, bypassing page cache.
+pyte is a test-only dependency installed under /tmp/nova-terminal-test;
+it is not needed to launch btop. Test output is in test-results.txt.
+
+UI checks: test_nova_ui.py exercises native braille/block/TTY symbols, both
+I/O graph modes, help redraws and live resizing. Its output is in
+test-ui-results.txt. Default installation and rollback were staged and tested
+inside production-stage before installing outside the workspace.
+
+CPU grid validation: tests/nova_cpu_grid.cpp checks fit and bounds for
+1–1024 processors. test_cpu_grid.py verifies all 32 histories, a pinned CPU
+load, native braille/block/TTY symbols, Shift+L, shrink/grow restoration, help
+redraw and preference persistence in a real terminal. Output is in
+test-cpu-results.txt.
+
+GPU/boot validation: test_gpu_boot.py verifies live boot/EFI collection from
+Nova's mounted partitions, visibility persistence and the unchanged disk
+filter. Its test-only NVML library provides distinct 20-30% load and 75-85%
+VRAM occupancy, allowing the two rendered graph heights to be checked
+independently. It also covers missing sensors, pinning, four presets, CPU
+bottom placement, legacy toggling, help redraw, resizing, and all native
+symbols in a narrow GPU-only panel. The fixture stays inside a temporary
+test directory and is never installed. Results: test-gpu-boot-results.txt.
+Real RTX 5090 readings use the existing NVIDIA NVML collector; this terminal
+sandbox cannot access the GPU device, so hardware readings need checking in
+the user's normal terminal after restart.
+Preset tests also exposed upstream temporary string-view keys in deferred
+configuration changes and invalid GPU preset graph keys. Both are corrected.
+
+No GitHub publication has been performed. The branch and local commits are
+ready for the user's hardware check before choosing a fork destination.
+
+Mount table validation: tests/nova_mounts.cpp checks escaped mount paths,
+control-character display, bind/loop exclusion, deduplication, Btrfs/ZFS,
+column bounds and process-space limits. test_mounts.py compares all five
+Nova filesystems and raw byte counts against installed duf, verifies that
+newly allocated blocks are reflected, and drives a real terminal through
+process selection, details, scrolling, filtering, tree view, help, Shift+M,
+resizing, automatic fallback/restoration and presets with the GPU pinned.
+It writes/removes one 64 MiB temporary file inside the checkout. Output is in
+test-mounts-results.txt. No files are written to boot or EFI.
+
+Coloured GPU validation: tests/nova_gpu_history.cpp checks all eight Braille
+dot positions, finer horizontal/vertical resolution, clipping, ASCII dots,
+raster bounds, 0/100% axes, overlapping series, gaps and process-space limits.
+test_gpu_color.py drives a real terminal with test-only NVML providers for
+v3/v2/v1 process APIs and a legacy provider with no optional APIs. It checks
+merged graphics/compute clients, VRAM allocation, real /proc identity and
+host CPU/RSS, unknown identities, stale/unavailable samples, partial lists,
+process creation races, truncation, distinct plot/legend colours, mount colours,
+TTY/256-colour fallbacks, toggles, resizing, presets, help and persistence.
+The GPU preview is explicitly labelled synthetic; host mount values are real.
+Results: test-gpu-color-results.txt. Physical RTX 5090 comparison with nvtop
+remains a normal-terminal check because the sandbox cannot access GPU devices.
+test_gpu_dots.py renders a dense four-colour simulated history, checks both
+dot columns, inherited TTY symbols and small-window restoration, and exports
+nova-gpu-dots-preview.png. Results: test-gpu-dots-results.txt.
+
+Layout validation: tests/nova_layout.cpp checks CPU grid preservation, compact
+memory and minimum network budgets, full-width columns and mount table bounds.
+test_layout.py drives a real terminal at 200x100, 146x96, 110x60 and 80x35; it
+checks the CPU/GPU height transfer, larger network area, every mounted device
+path, all 32 logical histories, table mouse bounds, process details, boot/EFI
+cards, help, presets, CPU-bottom, process-left, network-above-memory and hidden
+panels. It verifies short-window fallback and restoration. Results are in
+test-layout-results.txt; nova-layout-preview.png labels synthetic GPU readings.
+test_install.py stages an upgrade from the current profile, verifies one-time
+swap hiding, later preference preservation, wrapper recovery, unchanged shell
+settings on repeat installation, and unchanged packaged btop/original config.
+
+Zram validation: tests/nova_zram.cpp checks old/new mm_stat parsing, original
+versus compressed versus allocator bytes, idle swap headers, negative savings,
+same-element pages, zero denominators, multiple devices, mixed algorithms,
+overflow, missing/malformed data, refreshed counters and footer space limits.
+test_zram.py compares Nova's actual counters with sysfs and verifies live
+visibility. A test-only process-local file-read shim supplies simulated
+active/idle counters to verify automatic hide/show transitions and unavailable
+statistics without modifying sysfs or generating swap. It also verifies RAM
+metrics, fixed network position, Shift+Z, filter focus, help, small-window
+fallback/restoration, preference persistence, binary/decimal sizes, restored
+swap display and native braille/block/TTY styles in a real terminal. Results
+are in test-zram-results.txt. No memory pressure or swap activity is generated.
+Both Nova collectors are listed in the CMake target; this host has no cmake
+executable, so the CMake build was not run. The Make build passed.

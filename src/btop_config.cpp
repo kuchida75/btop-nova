@@ -111,6 +111,9 @@ namespace Config {
 
 		{"proc_filter_kernel",  "#* (Linux) Filter processes tied to the Linux kernel(similar behavior to htop)."},
 
+		{"proc_mounts", "#* (Linux) Show a live mounted-filesystem table. Shift+M toggles; small panels restore the full process list."},
+		{"nova_layout", "#* Give GPU histories more CPU space, compact memory when swap is hidden, and place mounts across the body bottom."},
+
 		{"proc_aggregate",		"#* In tree-view, always accumulate child process resources in the parent process."},
 
 		{"cpu_graph_upper", 	"#* Sets the CPU stat shown in upper half of the CPU graph, \"total\" is always available.\n"
@@ -124,6 +127,8 @@ namespace Config {
 		{"cpu_invert_lower", 	"#* Toggles if the lower CPU graph should be inverted."},
 
 		{"cpu_single_graph", 	"#* Set to True to completely disable the lower CPU graph."},
+
+		{"cpu_logical_graphs", 	"#* Show a graph for each logical processor. Falls back to a single total CPU graph when the panel is too small. Toggle with Shift+L."},
 
 		{"cpu_bottom",			"#* Show cpu box at bottom of screen instead of top."},
 
@@ -163,10 +168,13 @@ namespace Config {
 		{"zfs_arc_cached",		"#* Count ZFS ARC in cached and available memory."},
 
 		{"show_swap", 			"#* If swap memory should be shown in memory box."},
+		{"show_zram", "#* (Linux) Show zram compression, actual RAM cost and net savings below RAM graphs. Shift+Z toggles; hides when unused or insufficient space."},
 
 		{"swap_disk", 			"#* Show swap as a disk, ignores show_swap value above, inserts itself after first disk."},
 
 		{"show_disks", 			"#* If mem box should be split to also show disks info."},
+
+		{"show_boot_disks", "#* (Linux) Show mounted /boot and /boot/efi independently of disks_filter. Toggle with Shift+B."},
 
 		{"only_physical", 		"#* Filter out non physical disks. Set this to False to include network disks, RAM disks and similar."},
 
@@ -176,7 +184,7 @@ namespace Config {
 
 		{"disk_free_priv",		"#* Set to true to show available disk space for privileged users."},
 
-		{"show_io_stat", 		"#* Toggles if io activity % (disk busy time) should be shown in regular disk usage view."},
+		{"show_io_stat", 		"#* Show the disk busy-time graph in I/O mode. Read/write history is always shown in normal disk mode."},
 
 		{"io_mode", 			"#* Toggles io mode for disks, showing big graphs for disk read/write speeds."},
 
@@ -206,7 +214,13 @@ namespace Config {
 		{"nvml_measure_pcie_speeds",
 								"#* Measure PCIe throughput on NVIDIA cards, may impact performance on certain cards."},
 
-		{"gpu_mirror_graph",	"#* Horizontally mirror the GPU graph."},
+		{"gpu_always_visible", "#* Keep the first detected GPU panel visible, including across presets. Disable to allow the 5 key to hide it."},
+
+		{"gpu_nvtop_graph", "#* Coloured GPU/VRAM/clock Braille dot histories. Shift+N toggles; small charts fall back to GPU/VRAM."},
+		{"gpu_processes", "#* (NVIDIA Linux) GPU process table under the chart. Shift+U toggles; hidden when space is insufficient."},
+		{"gpu_split_vram", "#* Show GPU load above and allocated VRAM percent below as independent 0-100% histories. Toggle with Shift+V."},
+
+		{"gpu_mirror_graph",	"#* Mirror the GPU load graph when gpu_split_vram is False."},
 
 		{"custom_gpu_name0",	"#* Custom gpu0 model name, empty string to disable."},
 		{"custom_gpu_name1",	"#* Custom gpu1 model name, empty string to disable."},
@@ -271,6 +285,7 @@ namespace Config {
 		{"proc_filter_kernel", false},
 		{"cpu_invert_lower", true},
 		{"cpu_single_graph", false},
+		{"cpu_logical_graphs", false},
 		{"cpu_bottom", false},
 		{"show_uptime", true},
 		{"check_temp", true},
@@ -281,8 +296,10 @@ namespace Config {
 		{"mem_below_net", false},
 		{"zfs_arc_cached", true},
 		{"show_swap", true},
+		{"show_zram", false},
 		{"swap_disk", true},
 		{"show_disks", true},
+		{"show_boot_disks", false},
 		{"only_physical", true},
 		{"use_fstab", true},
 		{"zfs_hide_datasets", false},
@@ -301,9 +318,15 @@ namespace Config {
 		{"show_detailed", false},
 		{"proc_filtering", false},
 		{"proc_aggregate", false},
+		{"proc_mounts", false},
+		{"nova_layout", false},
 	#ifdef GPU_SUPPORT
 		{"nvml_measure_pcie_speeds", true},
 		{"gpu_mirror_graph", true},
+		{"gpu_always_visible", false},
+		{"gpu_split_vram", true},
+		{"gpu_nvtop_graph", false},
+		{"gpu_processes", false},
 	#endif
 	};
 	std::unordered_map<std::string_view, bool> boolsTmp;
@@ -454,7 +477,7 @@ namespace Config {
 			if (vals.at(0) == "cpu") set("cpu_bottom", (vals.at(1) == "0" ? false : true));
 			else if (vals.at(0) == "mem") set("mem_below_net", (vals.at(1) == "0" ? false : true));
 			else if (vals.at(0) == "proc") set("proc_left", (vals.at(1) == "0" ? false : true));
-			set("graph_symbol_" + vals.at(0), vals.at(2));
+			set("graph_symbol_" + (vals.at(0).starts_with("gpu") ? "gpu"s : vals.at(0)), vals.at(2));
 		}
 
 		if (check_boxes(boxes)) set("shown_boxes", boxes);
@@ -626,6 +649,16 @@ namespace Config {
 		}
 		current_boxes = std::move(new_boxes);
 		return true;
+	}
+
+	void ensure_gpu_visible() {
+	#ifdef GPU_SUPPORT
+		if (not getB("gpu_always_visible") or Gpu::gpu_names.empty()) return;
+		auto boxes = getS("shown_boxes");
+		if (v_contains(ssplit(boxes), "gpu0"s)) return;
+		boxes += (boxes.empty() ? "" : " ") + "gpu0"s;
+		if (check_boxes(boxes)) set("shown_boxes", boxes);
+	#endif
 	}
 
 	void toggle_box(const string& box) {

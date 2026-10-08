@@ -1,5 +1,18 @@
 # ![btop++](Img/logo.png)
 
+## Nova btop fork
+
+This fork adds permanent disk read/write throughput, fine coloured GPU dot
+histories and a GPU process summary, optional logical CPU graphs, a full-width
+mount table and an automatically hidden idle-zram summary. It preserves the
+installed upstream `btop`.
+
+**[Nova installation, packages and controls →](README_NOVA.md)**
+
+![Nova GPU dot chart with simulated readings](Img/nova-gpu-dots.png)
+
+The upstream documentation and acknowledgements follow below.
+
 <a href="https://repology.org/project/btop/versions">
     <img src="https://repology.org/badge/vertical-allrepos/btop.svg" alt="Packaging status" align="right">
 </a>

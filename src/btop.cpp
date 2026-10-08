@@ -48,6 +48,7 @@ tab-size = 4
 #include "btop_shared.hpp"
 #include "btop_tools.hpp"
 #include "btop_config.hpp"
+#include "btop_mounts.hpp"
 #include "btop_input.hpp"
 #include "btop_theme.hpp"
 #include "btop_draw.hpp"
@@ -78,7 +79,7 @@ namespace Global {
 		{"#801414", "██████╔╝   ██║   ╚██████╔╝██║        ╚═╝    ╚═╝"},
 		{"#000000", "╚═════╝    ╚═╝    ╚═════╝ ╚═╝"},
 	};
-	const string Version = "1.3.0";
+	const string Version = "1.3.0-nova-io9";
 
 	int coreCount;
 	string overlay;
@@ -254,6 +255,7 @@ void term_resize(bool force) {
 						auto box = all_boxes.at(intKey);
 						Config::current_preset = -1;
 						Config::toggle_box(box);
+						Config::ensure_gpu_visible();
 						boxes = Config::getS("shown_boxes");
 					}
 				}
@@ -658,6 +660,7 @@ namespace Runner {
 						if (Global::debug) debug_timer("proc", collect_begin);
 
 						//? Start collect
+						if (Config::getB("proc_mounts")) Mounts::collect(conf.no_update);
 						auto proc = Proc::collect(conf.no_update);
 
 						if (Global::debug) debug_timer("proc", draw_begin);
@@ -1023,6 +1026,8 @@ int main(int argc, char **argv) {
 		Config::check_boxes("cpu mem net proc");
 		Config::set("shown_boxes", "cpu mem net proc"s);
 	}
+
+	Config::ensure_gpu_visible();
 
 	//? Update list of available themes and generate the selected theme
 	Theme::updateThemes();

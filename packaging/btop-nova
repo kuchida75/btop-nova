@@ -1,0 +1,11 @@
+#!/bin/sh
+# Separate package command; no changes to the installed upstream btop.
+set -eu
+program_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+prefix=$(dirname -- "$program_dir")
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/btop-nova"
+mkdir -p "$XDG_CONFIG_HOME/btop"
+if [ ! -e "$XDG_CONFIG_HOME/btop/btop.conf" ]; then
+    cp -- "$prefix/share/btop-nova/default.conf" "$XDG_CONFIG_HOME/btop/btop.conf"
+fi
+exec "$prefix/lib/btop-nova/bin/btop" "$@"

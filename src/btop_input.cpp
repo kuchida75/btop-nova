@@ -31,6 +31,7 @@ tab-size = 4
 #include "btop_shared.hpp"
 #include "btop_menu.hpp"
 #include "btop_draw.hpp"
+#include "btop_mounts.hpp"
 
 using namespace Tools;
 using namespace std::literals; // for operator""s
@@ -265,6 +266,11 @@ namespace Input {
 				if (not keep_going) return;
 			}
 
+			// The shared mount table is informational; it must not select or
+			// scroll a process when its rows extend under the memory/net column.
+			if (not filtering and key.starts_with("mouse_") and Mounts::layout.full_width and Mounts::layout.height > 0
+				and mouse_pos[1] >= Mounts::layout.y and mouse_pos[1] < Mounts::layout.y + Mounts::layout.height) return;
+
 			//? Input actions for proc box
 			if (Proc::shown) {
 				bool keep_going = false;
@@ -309,6 +315,12 @@ namespace Input {
 					Proc::filter = { Config::getS("proc_filter") };
 					old_filter = Proc::filter.text;
 				}
+				else if (key == "M") {
+					Config::flip("proc_mounts");
+					Draw::calcSizes();
+					Runner::run("all", false, true);
+					return;
+				}
 				else if (key == "e") {
 					Config::flip("proc_tree");
 					no_update = false;
@@ -330,7 +342,7 @@ namespace Input {
 					redraw = false;
 					const auto& [col, line] = mouse_pos;
 					const int y = (Config::getB("show_detailed") ? Proc::y + 8 : Proc::y);
-					const int height = (Config::getB("show_detailed") ? Proc::height - 8 : Proc::height);
+					const int height = (Config::getB("show_detailed") ? Proc::list_height - 8 : Proc::list_height);
 					if (col >= Proc::x + 1 and col < Proc::x + Proc::width and line >= y + 1 and line < y + height - 1) {
 						if (key == "mouse_click") {
 							if (col < Proc::x + Proc::width - 2) {
@@ -420,6 +432,11 @@ namespace Input {
 				else keep_going = true;
 
 				if (not keep_going) {
+					if (key == "enter" and Config::getB("nova_layout")) {
+						Draw::calcSizes();
+						Runner::run("all", no_update, true);
+						return;
+					}
 					Runner::run("proc", no_update, redraw);
 					return;
 				}
@@ -432,7 +449,13 @@ namespace Input {
 				bool redraw = true;
 				static uint64_t last_press = 0;
 
-				if (key == "+" and Config::getI("update_ms") <= 86399900) {
+				if (key == "L") {
+					Config::flip("cpu_logical_graphs");
+					Draw::calcSizes();
+					Runner::run("all", true, true);
+					return;
+				}
+				else if (key == "+" and Config::getI("update_ms") <= 86399900) {
 					int add = (Config::getI("update_ms") <= 86399000 and last_press >= time_ms() - 200
 						and rng::all_of(Input::history, [](const auto& str){ return str == "+"; })
 						? 1000 : 100);
@@ -456,14 +479,41 @@ namespace Input {
 				}
 			}
 
+		#ifdef GPU_SUPPORT
+			if (is_in(key, "V", "N", "U") and Gpu::shown != 0) {
+				if (key == "V" and Config::getB("gpu_nvtop_graph")) {
+					Config::set("gpu_nvtop_graph", false);
+					Config::set("gpu_split_vram", true);
+				} else Config::flip(key == "N" ? "gpu_nvtop_graph" : key == "U" ? "gpu_processes" : "gpu_split_vram");
+				Draw::calcSizes();
+				Runner::run("all", true, true);
+				return;
+			}
+		#endif
+
 			//? Input actions for mem box
 			if (Mem::shown) {
 				bool keep_going = false;
 				bool no_update = true;
 				bool redraw = true;
 
-				if (key == "i") {
+				if (key == "Z") {
+					Config::flip("show_zram");
+					Draw::calcSizes();
+					Runner::run("all", false, true);
+					return;
+				}
+				else if (key == "i") {
 					Config::flip("io_mode");
+				}
+				else if (key == "B") {
+					Config::flip("show_boot_disks");
+					if (Config::getB("nova_layout")) {
+						Draw::calcSizes();
+						Runner::run("all", false, true);
+						return;
+					}
+					no_update = false;
 				}
 				else if (key == "d") {
 					Config::flip("show_disks");

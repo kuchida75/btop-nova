@@ -25,6 +25,8 @@ tab-size = 4
 #include <unistd.h>
 #include <numeric>
 #include <sys/statvfs.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <netdb.h>
 #include <ifaddrs.h>
 #include <net/if.h>
@@ -128,6 +130,18 @@ namespace Gpu {
 
 		struct nvmlUtilization_t {unsigned int gpu, memory;};
 		struct nvmlMemory_t {unsigned long long total, free, used;};
+
+		// Optional process APIs: v2 and v3 share this 24-byte layout; v1 is 16 bytes.
+		// Definitions match the local NVIDIA nvml.h, without a build-time SDK dependency.
+		struct ProcessInfo { unsigned int pid; unsigned long long memory; unsigned int gpu_instance, compute_instance; };
+		struct ProcessInfoV1 { unsigned int pid; unsigned long long memory; };
+		struct ProcessSample { unsigned int pid; unsigned long long timestamp; unsigned int sm, mem, enc, dec; };
+		using ProcessesFn = nvmlReturn_t (*)(nvmlDevice_t, unsigned int*, ProcessInfo*);
+		using ProcessesV1Fn = nvmlReturn_t (*)(nvmlDevice_t, unsigned int*, ProcessInfoV1*);
+		ProcessesFn graphics_processes{}, compute_processes{};
+		ProcessesV1Fn graphics_processes_v1{}, compute_processes_v1{};
+		nvmlReturn_t (*get_process_utilization)(nvmlDevice_t, ProcessSample*, unsigned int*, unsigned long long){};
+		nvmlReturn_t (*get_max_clock)(nvmlDevice_t, nvmlClockType_t, unsigned int*){};
 
 		//? Function pointers
 		const char* (*nvmlErrorString)(nvmlReturn_t);
@@ -995,6 +1009,17 @@ namespace Gpu {
 
             #undef LOAD_SYM
 
+			// New APIs are optional; an older driver must still show the GPU panel.
+			const auto optional = [&](const char* name) { dlerror(); auto ptr = dlsym(nvml_dl_handle, name); dlerror(); return ptr; };
+			graphics_processes = (ProcessesFn)optional("nvmlDeviceGetGraphicsRunningProcesses_v3");
+			if (not graphics_processes) graphics_processes = (ProcessesFn)optional("nvmlDeviceGetGraphicsRunningProcesses_v2");
+			if (not graphics_processes) graphics_processes_v1 = (ProcessesV1Fn)optional("nvmlDeviceGetGraphicsRunningProcesses");
+			compute_processes = (ProcessesFn)optional("nvmlDeviceGetComputeRunningProcesses_v3");
+			if (not compute_processes) compute_processes = (ProcessesFn)optional("nvmlDeviceGetComputeRunningProcesses_v2");
+			if (not compute_processes) compute_processes_v1 = (ProcessesV1Fn)optional("nvmlDeviceGetComputeRunningProcesses");
+			get_process_utilization = (decltype(get_process_utilization))optional("nvmlDeviceGetProcessUtilization");
+			get_max_clock = (decltype(get_max_clock))optional("nvmlDeviceGetMaxClockInfo");
+
 			//? Function calls
 			nvmlReturn_t result = nvmlInit();
     		if (result != NVML_SUCCESS) {
@@ -1034,6 +1059,146 @@ namespace Gpu {
 			return !initialized;
 		}
 
+		struct ProcessCpu { unsigned long long ticks{}, start{}; uint64_t timestamp{}; };
+		vector<std::unordered_map<unsigned int, ProcessCpu>> process_cpu;
+		vector<unsigned long long> process_timestamp;
+		vector<std::unordered_map<unsigned int, ProcessSample>> process_samples;
+
+		uint64_t steady_ms() {
+			return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		}
+
+		void process_metadata(gpu_process& proc, ProcessCpu& old, uint64_t now) {
+			const auto path = Shared::procPath / to_string(proc.pid);
+			ifstream stat(path / "stat");
+			string line;
+			if (not getline(stat, line)) return;
+			const auto close = line.rfind(')');
+			if (close == string::npos) return;
+			std::istringstream fields(line.substr(close + 2));
+			vector<string> words;
+			for (string word; fields >> word;) words.push_back(word);
+			if (words.size() < 22) return;
+			try {
+				const auto ticks = std::stoull(words[11]) + std::stoull(words[12]);
+				const auto start = std::stoull(words[19]);
+				const auto rss = std::stoll(words[21]);
+				if (old.start == start and old.timestamp and now > old.timestamp and ticks >= old.ticks)
+					proc.cpu = (ticks - old.ticks) * 100000.0 / (Shared::clkTck * (now - old.timestamp));
+				old = {ticks, start, now};
+				proc.host_memory = max(0ll, rss) * Shared::pageSize;
+			} catch (const std::exception&) { return; } // Process exited or stat changed while reading.
+			ifstream status(path / "status");
+			while (getline(status, line)) if (line.starts_with("Uid:")) {
+				unsigned int uid;
+				std::istringstream uid_field(line.substr(4));
+				if (uid_field >> uid) {
+					proc.user = to_string(uid);
+					#if !(defined(STATIC_BUILD) && defined(__GLIBC__))
+					struct passwd record, *found = nullptr;
+					char buffer[16384];
+					if (getpwuid_r(uid, &record, buffer, sizeof(buffer), &found) == 0 and found) proc.user = found->pw_name;
+					#endif
+				}
+				break;
+			}
+			ifstream command(path / "cmdline", std::ios::binary);
+			char buffer[4096];
+			command.read(buffer, sizeof(buffer));
+			proc.command.assign(buffer, command.gcount());
+			for (auto& c : proc.command) {
+				if (c == 0) c = ' ';
+				else if ((unsigned char)c < 32 or c == 127) c = '?';
+			}
+			proc.command = trim(proc.command);
+			if (command.gcount() == 0) {
+				ifstream comm(path / "comm");
+				if (not getline(comm, proc.command)) proc.command = "--";
+			}
+		}
+
+		template<class Info, class Fn>
+		bool read_processes(nvmlDevice_t device, Fn fn, vector<Info>& entries) {
+			if (not fn) return false;
+			unsigned int count = 0;
+			auto status = fn(device, &count, nullptr);
+			if (status != NVML_SUCCESS and status != 7) return false; // NVML_ERROR_INSUFFICIENT_SIZE
+			for (int attempt = 0; attempt < 3; ++attempt) {
+				if (count > 65536) return false;
+				if (count == 0) { entries.clear(); return true; }
+				entries.resize(count);
+				status = fn(device, &count, entries.data());
+				if (status == NVML_SUCCESS and count <= entries.size()) { entries.resize(count); return true; }
+				if (status != 7) return false;
+			}
+			return false;
+		}
+
+		void collect_processes(gpu_info& gpu, unsigned int device_index) {
+			gpu.processes.clear();
+			gpu.graphics_processes_available = gpu.compute_processes_available = false;
+			if (not Config::getB("gpu_processes")) return;
+			std::unordered_map<unsigned int, gpu_process> merged;
+			const auto add = [&](const auto& entries, bool graphics) {
+				for (const auto& entry : entries) {
+					auto& proc = merged[entry.pid];
+					proc.pid = entry.pid;
+					(graphics ? proc.graphics : proc.compute) = true;
+					if (entry.memory != std::numeric_limits<unsigned long long>::max())
+						proc.memory = max(proc.memory, static_cast<long long>(min(entry.memory, static_cast<unsigned long long>(std::numeric_limits<long long>::max()))));
+				}
+			};
+			for (bool graphics : {true, false}) {
+				bool available;
+				if (auto fn = graphics ? graphics_processes : compute_processes) {
+					vector<ProcessInfo> entries;
+					available = read_processes(devices[device_index], fn, entries);
+					if (available) add(entries, graphics);
+				} else {
+					vector<ProcessInfoV1> entries;
+					available = read_processes(devices[device_index], graphics ? graphics_processes_v1 : compute_processes_v1, entries);
+					if (available) add(entries, graphics);
+				}
+				(graphics ? gpu.graphics_processes_available : gpu.compute_processes_available) = available;
+			}
+			process_samples.resize(device_count);
+			auto& latest = process_samples[device_index];
+			if (get_process_utilization and not merged.empty()) {
+				process_timestamp.resize(device_count);
+				unsigned int count = 0;
+				auto status = get_process_utilization(devices[device_index], nullptr, &count, process_timestamp[device_index]);
+				for (int attempt = 0; status == 7 and count > 0 and count <= 65536 and attempt < 3; ++attempt) {
+					vector<ProcessSample> samples(count);
+					status = get_process_utilization(devices[device_index], samples.data(), &count, process_timestamp[device_index]);
+					if (status != NVML_SUCCESS or count > samples.size()) continue;
+					for (unsigned int n = 0; n < count; ++n) {
+						const auto& sample = samples[n];
+						process_timestamp[device_index] = max(process_timestamp[device_index], sample.timestamp);
+						// Reject stale driver samples, including on the first query.
+						if (sample.timestamp + 3000000 < time_micros()) continue;
+						auto& previous = latest[sample.pid];
+						if (sample.timestamp >= previous.timestamp) previous = sample;
+					}
+				}
+				if (status != NVML_SUCCESS and status != 6) latest.clear();
+			}
+			std::erase_if(latest, [&](const auto& item) { return not merged.contains(item.first) or item.second.timestamp + 3000000 < time_micros(); });
+			process_cpu.resize(device_count);
+			auto& cache = process_cpu[device_index];
+			const auto now = steady_ms();
+			for (auto& [pid, proc] : merged) {
+				if (latest.contains(pid)) proc.utilization = static_cast<int>(min(latest[pid].sm, 100u));
+				process_metadata(proc, cache[pid], now);
+				gpu.processes.push_back(std::move(proc));
+			}
+			std::erase_if(cache, [&](const auto& item) { return not merged.contains(item.first); });
+			std::sort(gpu.processes.begin(), gpu.processes.end(), [](const auto& a, const auto& b) {
+				if (a.utilization != b.utilization) return a.utilization > b.utilization;
+				if (a.memory != b.memory) return a.memory > b.memory;
+				return a.pid < b.pid;
+			});
+		}
+
 		template <bool is_init> // collect<1> is called in Nvml::init(), and populates gpus.supported_functions
 		bool collect(gpu_info* gpus_slice) { // raw pointer to vector data, size == device_count
 			if (!initialized) return false;
@@ -1042,6 +1207,9 @@ namespace Gpu {
 			std::thread pcie_tx_thread, pcie_rx_thread;
 			// DebugTimer nvTotalTimer("Nvidia Total");
 			for (unsigned int i = 0; i < device_count; ++i) {
+				GpuHistory::Sample sample;
+				gpus_slice[i].gpu_clock_valid = gpus_slice[i].mem_clock_valid = false;
+				sample.timestamp = steady_ms();
 				if constexpr(is_init) {
 					//? Device Handle
     				result = nvmlDeviceGetHandleByIndex(i, devices.data() + i);
@@ -1051,6 +1219,12 @@ namespace Gpu {
     					continue;
         			}
 
+					//? Maximum clocks are optional; never normalize to a guessed peak.
+					if (get_max_clock) {
+						unsigned int maximum{};
+						if (get_max_clock(devices[i], NVML_CLOCK_GRAPHICS, &maximum) == NVML_SUCCESS) gpus_slice[i].gpu_clock_max = maximum;
+						if (get_max_clock(devices[i], NVML_CLOCK_MEM, &maximum) == NVML_SUCCESS) gpus_slice[i].mem_clock_max = maximum;
+					}
 					//? Device name
 					char name[NVML_DEVICE_NAME_BUFFER_SIZE];
     				result = nvmlDeviceGetName(devices[i], name, NVML_DEVICE_NAME_BUFFER_SIZE);
@@ -1114,6 +1288,7 @@ namespace Gpu {
     				} else {
 						gpus_slice[i].gpu_percent.at("gpu-totals").push_back((long long)utilization.gpu);
 						gpus_slice[i].mem_utilization_percent.push_back((long long)utilization.memory);
+						sample.values[0] = utilization.gpu;
     				}
 				}
 
@@ -1125,7 +1300,11 @@ namespace Gpu {
     				if (result != NVML_SUCCESS) {
 						Logger::warning(std::string("NVML: Failed to get GPU clock speed: ") + nvmlErrorString(result));
 						if constexpr(is_init) gpus_slice[i].supported_functions.gpu_clock = false;
-					} else gpus_slice[i].gpu_clock_speed = (long long)gpu_clock;
+					} else {
+						gpus_slice[i].gpu_clock_speed = gpu_clock;
+						gpus_slice[i].gpu_clock_valid = true;
+						if (gpus_slice[i].gpu_clock_max) sample.values[2] = static_cast<long long>(gpu_clock) * 100 / gpus_slice[i].gpu_clock_max;
+					}
 				}
 
 				if (gpus_slice[i].supported_functions.mem_clock) {
@@ -1134,7 +1313,11 @@ namespace Gpu {
     				if (result != NVML_SUCCESS) {
 						Logger::warning(std::string("NVML: Failed to get VRAM clock speed: ") + nvmlErrorString(result));
 						if constexpr(is_init) gpus_slice[i].supported_functions.mem_clock = false;
-					} else gpus_slice[i].mem_clock_speed = (long long)mem_clock;
+					} else {
+						gpus_slice[i].mem_clock_speed = mem_clock;
+						gpus_slice[i].mem_clock_valid = true;
+						if (gpus_slice[i].mem_clock_max) sample.values[3] = static_cast<long long>(mem_clock) * 100 / gpus_slice[i].mem_clock_max;
+					}
 				}
 
 				// nvTimer.stop_rename_reset("Nv power");
@@ -1187,21 +1370,15 @@ namespace Gpu {
 						gpus_slice[i].mem_used = memory.used;
 						//gpu.mem_free = memory.free;
 
-						auto used_percent = (long long)round((double)memory.used * 100.0 / (double)memory.total);
+						auto used_percent = memory.total ? (long long)round((double)memory.used * 100.0 / (double)memory.total) : 0;
+						sample.values[1] = memory.total ? used_percent : -1;
 						gpus_slice[i].gpu_percent.at("gpu-vram-totals").push_back(used_percent);
 					}
 				}
 
-    			//? TODO: Processes using GPU
-    				/*unsigned int proc_info_len;
-    				nvmlProcessInfo_t* proc_info = 0;
-    				result = nvmlDeviceGetComputeRunningProcesses_v3(device, &proc_info_len, proc_info);
-    				if (result != NVML_SUCCESS) {
-						Logger::warning(std::string("NVML: Failed to get compute processes: ") + nvmlErrorString(result));
-    				} else {
-    					for (unsigned int i = 0; i < proc_info_len; ++i)
-    						gpus_slice[i].graphics_processes.push_back({proc_info[i].pid, proc_info[i].usedGpuMemory});
-    				}*/
+				gpus_slice[i].history.push_back(sample);
+				while (gpus_slice[i].history.size() > static_cast<size_t>(max(300, Gpu::width * 2))) gpus_slice[i].history.pop_front();
+				if constexpr(not is_init) collect_processes(gpus_slice[i], i);
 
 				// nvTimer.stop_rename_reset("Nv pcie thread join");
 				//? Join PCIE TX/RX threads
@@ -1546,6 +1723,7 @@ namespace Mem {
 		auto& mem = current_mem;
 
 		mem.stats.at("swap_total") = 0;
+		mem.zram = Config::getB("show_zram") ? Zram::collect() : Zram::Snapshot{};
 
 		//? Read ZFS ARC info from /proc/spl/kstat/zfs/arcstats
 		uint64_t arc_size = 0, arc_min_size = 0;
@@ -1636,6 +1814,7 @@ namespace Mem {
 				auto& disks_filter = Config::getS("disks_filter");
 				bool filter_exclude = false;
 				auto use_fstab = Config::getB("use_fstab");
+				const bool show_boot_disks = Config::getB("show_boot_disks");
 				auto only_physical = Config::getB("only_physical");
 				auto zfs_hide_datasets = Config::getB("zfs_hide_datasets");
 				auto& disks = mem.disks;
@@ -1705,8 +1884,12 @@ namespace Mem {
 
 						if (v_contains(ignore_list, mountpoint) or v_contains(found, mountpoint)) continue;
 
-						//? Match filter if not empty
-						if (not filter.empty()) {
+						// Boot partitions have an independent visibility switch. They
+						// must still be mounted and pass the filesystem checks below.
+						const bool boot_disk = is_in(mountpoint, "/boot", "/boot/efi");
+						if (boot_disk and not show_boot_disks) continue;
+						//? Match the normal filter for other disks
+						if (not boot_disk and not filter.empty()) {
 							bool match = v_contains(filter, mountpoint);
 							if ((filter_exclude and match) or (not filter_exclude and not match))
 								continue;
@@ -1749,6 +1932,14 @@ namespace Mem {
 									}
 									devname.resize(devname.size() - 1);
 									c++;
+								}
+								// Device aliases can be absent in a restricted /dev (notably LVM).
+								if (disks.at(mountpoint).stat.empty() and fstype != "zfs") {
+									struct stat mounted{};
+									if (::stat(mountpoint.c_str(), &mounted) == 0) {
+										const auto stat_path = fs::path("/sys/dev/block") / (to_string(major(mounted.st_dev)) + ":" + to_string(minor(mounted.st_dev))) / "stat";
+										if (fs::exists(stat_path, ec)) disks.at(mountpoint).stat = stat_path;
+									}
 								}
 							}
 
@@ -1840,17 +2031,41 @@ namespace Mem {
 				}
 				for (const auto& name : last_found)
 					#ifdef SNAPPED
-						if (not is_in(name, "/mnt", "swap")) mem.disks_order.push_back(name);
+						if (not is_in(name, "/mnt", "swap", "/boot", "/boot/efi")) mem.disks_order.push_back(name);
 					#else
-						if (not is_in(name, "/", "swap")) mem.disks_order.push_back(name);
+						if (not is_in(name, "/", "swap", "/boot", "/boot/efi")) mem.disks_order.push_back(name);
 					#endif
+				// Keep data disks first when a short terminal cannot fit every card.
+				for (const auto& mount : {"/boot"s, "/boot/efi"s})
+					if (disks.contains(mount)) mem.disks_order.push_back(mount);
 
 				//? Get disks IO
 				int64_t sectors_read, sectors_write, io_ticks, io_ticks_temp;
 				disk_ios = 0;
 				for (auto& [ignored, disk] : disks) {
-					if (disk.stat.empty() or access(disk.stat.c_str(), R_OK) != 0) continue;
+					disk.throughput_valid = false;
+					if (disk.stat.empty() or access(disk.stat.c_str(), R_OK) != 0) {
+						disk.throughput_sample_time = 0;
+						continue;
+					}
+					const auto update_throughput = [&]() {
+						const double elapsed = uptime - disk.throughput_sample_time;
+						if (disk.throughput_sample_time > 0 and elapsed > 0 and not disk.io_read.empty() and not disk.io_write.empty()) {
+							// Store bytes/second so both numeric values and history graphs
+							// use the measured interval, including pauses and refresh changes.
+							disk.io_read.back() = llround(disk.io_read.back() / elapsed);
+							disk.io_write.back() = llround(disk.io_write.back() / elapsed);
+							disk.read_mib = disk.io_read.back() / 1048576.0;
+							disk.write_mib = disk.io_write.back() / 1048576.0;
+							disk.throughput_valid = true;
+						} else {
+							if (not disk.io_read.empty()) disk.io_read.back() = 0;
+							if (not disk.io_write.empty()) disk.io_write.back() = 0;
+						}
+						disk.throughput_sample_time = uptime;
+					};
 					if (disk.fstype == "zfs" && zfs_hide_datasets && zfs_collect_pool_total_stats(disk)) {
+						update_throughput();
 						disk_ios++;
 						continue;
 					}
@@ -1927,6 +2142,8 @@ namespace Mem {
 					} else {
 						Logger::debug("Error in Mem::collect() : when opening " + string{disk.stat});
 					}
+					if (not diskread.fail()) update_throughput();
+					else disk.throughput_sample_time = 0;
 					diskread.close();
 				}
 				old_uptime = uptime;

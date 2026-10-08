@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+checkout=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export XDG_CONFIG_HOME="$checkout/nova-config"
+# Always open the combined capacity/usage/throughput view.
+sed -i 's/^io_mode = .*/io_mode = False/' "$XDG_CONFIG_HOME/btop/btop.conf"
+# Older running builds may save a config without this new preference.
+if ! grep -q '^show_zram[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
+    printf '\n#* Zram compression and actual RAM cost.\nshow_zram = True\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
+fi
+if ! grep -q '^nova_layout[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
+    sed -i -e 's/^show_swap = .*/show_swap = False/' -e 's/^swap_disk = .*/swap_disk = False/' "$XDG_CONFIG_HOME/btop/btop.conf"
+    printf '\n#* More GPU height, compact memory and a full-width mount table.\nnova_layout = True\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
+fi
+if ! grep -q '^proc_mounts[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
+    printf '\n#* Live local mount table below processes.\nproc_mounts = True\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
+fi
+if ! grep -q '^gpu_always_visible[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
+    printf '\n#* Keep the first detected GPU panel visible.\ngpu_always_visible = True\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
+fi
+if ! grep -q '^gpu_nvtop_graph[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
+    printf '\n#* Coloured GPU/VRAM/clock histories.\ngpu_nvtop_graph = True\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
+fi
+if ! grep -q '^gpu_processes[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
+    printf '\n#* GPU processes below the chart.\ngpu_processes = True\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
+fi
+exec "$checkout/bin/btop" "$@"
