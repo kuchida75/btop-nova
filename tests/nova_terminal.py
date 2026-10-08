@@ -3,7 +3,7 @@ import codecs, fcntl, os, pathlib, pty, re, select, struct, subprocess, sys, tem
 sys.path.insert(0, '/tmp/nova-terminal-test')
 import pyte
 root = pathlib.Path(__file__).resolve().parents[1]
-base = (root / 'nova-config/btop/btop.conf').read_text()
+base = (root / 'packaging/default.conf').read_text()
 
 def config_with(**values):
     text = base
