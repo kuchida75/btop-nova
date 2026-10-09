@@ -4,17 +4,11 @@
 #include <iostream>
 
 int main() {
-	for (int width : {60, 80, 146, 200, 300})
-		for (int height = 8; height <= 100; ++height)
-			for (int count : {1, 8, 32, 64, 192, 1024})
-				for (int footer : {0, 1}) {
-					const auto compact = NovaLayout::cpu_height(height, width, count, true, footer);
-					assert(compact >= 8 and compact <= height);
-					if (Cpu::logical_grid_layout(width - 4, height - 4 - footer, count))
-						assert(Cpu::logical_grid_layout(width - 4, compact - 4 - footer, count));
-				}
-	assert(NovaLayout::cpu_height(21, 200, 32, false, 0) == 14);
-	assert(NovaLayout::cpu_height(21, 200, 32, true, 0) == 18);
+	for (int height = 1; height <= 300; ++height) {
+		const auto compact = NovaLayout::cpu_height(height);
+		assert(compact >= std::min(8, height) and compact <= height);
+	}
+	assert(NovaLayout::cpu_height(21) == 14);
 	assert(NovaLayout::memory_height(34, 49, 14, 6, false) == 23);
 	assert(NovaLayout::memory_height(34, 49, 14, 6, true) == 34);
 	for (int available = 16; available <= 150; ++available)
@@ -42,5 +36,5 @@ int main() {
 	}
 	assert(Mounts::columns(144, 17, 33, true).device == 33);
 	assert(Mounts::columns(198, 17, 33, true).mount == 17);
-	std::cout << "CPU grid preservation, memory/network budgets and full-width mount bounds passed\n";
+	std::cout << "Compact CPU, memory/network budgets and full-width mount bounds passed\n";
 }
