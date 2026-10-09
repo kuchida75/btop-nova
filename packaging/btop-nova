@@ -8,4 +8,5 @@ mkdir -p "$XDG_CONFIG_HOME/btop"
 if [ ! -e "$XDG_CONFIG_HOME/btop/btop.conf" ]; then
     cp -- "$prefix/share/btop-nova/default.conf" "$XDG_CONFIG_HOME/btop/btop.conf"
 fi
+sed -i '/^cpu_logical_graphs[[:space:]]*=/d' "$XDG_CONFIG_HOME/btop/btop.conf"
 exec "$prefix/lib/btop-nova/bin/btop" "$@"
