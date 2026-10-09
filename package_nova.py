@@ -129,7 +129,7 @@ def package(args):
             f'Installed-Size: {size}\nDepends: {depends}\nSection: utils\nPriority: optional\n'
             'Homepage: https://github.com/kuchida75/btop-nova\n'
             'Description: Nova btop with disk throughput and fine GPU histories\n'
-            ' Live per-disk read/write rates, logical CPU graphs, coloured GPU histories,\n'
+            ' Live per-disk read/write rates, coloured GPU histories,\n'
             ' NVIDIA processes, mounted filesystem summary and automatic zram statistics.\n'
             ' Installs a separate btop-nova command and preserves the upstream btop.\n')
         checks = []

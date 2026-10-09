@@ -43,6 +43,8 @@ for themes in (source/'share/btop/themes',source/'themes'):
 # Enable new preferences once, preserving later choices across upgrades.
 config_file=config/'btop.conf'
 config_text=config_file.read_text()
+# Remove the retired grid preference; retain the normal CPU graph choices.
+config_text=re.sub(r'^cpu_logical_graphs\s*=.*\n?', '', config_text, flags=re.M)
 # Apply the requested swap-display change once, alongside the new layout.
 # Subsequent upgrades keep the user's choices, including re-enabled swap.
 if not re.search(r'^nova_layout\s*=',config_text,flags=re.M):
@@ -52,7 +54,6 @@ if not re.search(r'^nova_layout\s*=',config_text,flags=re.M):
 new_preferences = {
     'show_zram': ('True', 'Zram compression, actual RAM cost and net savings; Shift+Z toggles.'),
     'nova_layout': ('True', 'More GPU height, compact memory and a full-width bottom mount table.'),
-    'cpu_logical_graphs': ('True', 'Logical processor graphs; Shift+L toggles, small panels use total CPU.'),
     'proc_mounts': ('True', 'Live local mount table below processes; Shift+M toggles.'),
     'show_boot_disks': ('False', 'Show mounted boot/EFI partitions; Shift+B toggles.'),
     'gpu_always_visible': ('True', 'Keep the first detected GPU panel visible across presets.'),
@@ -70,6 +71,7 @@ launcher=f'''#!/bin/sh
 set -eu
 export XDG_CONFIG_HOME={shlex.quote(str(install/'config'))}
 sed -i 's/^io_mode = .*/io_mode = False/' "$XDG_CONFIG_HOME/btop/btop.conf"
+sed -i '/^cpu_logical_graphs[[:space:]]*=/d' "$XDG_CONFIG_HOME/btop/btop.conf"
 if ! grep -q '^show_zram[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
     printf '\\n#* Zram compression and actual RAM cost.\\nshow_zram = True\\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
 fi

@@ -3,7 +3,7 @@
 ## Nova btop fork
 
 This fork adds permanent disk read/write throughput, fine coloured GPU dot
-histories and a GPU process summary, optional logical CPU graphs, a full-width
+histories and a GPU process summary, a full-width
 mount table and an automatically hidden idle-zram summary. It preserves the
 installed upstream `btop`.
 

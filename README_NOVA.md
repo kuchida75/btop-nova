@@ -1,7 +1,7 @@
 # Nova btop
 
 A Linux fork of [aristocratos/btop](https://github.com/aristocratos/btop), based
-on upstream v1.3.0. Current Nova version: **1.3.0-nova-io10**.
+on upstream v1.3.0. Current Nova version: **1.3.0-nova-io11**.
 
 ## AI disclosure and release privacy
 
@@ -16,12 +16,17 @@ preview uses simulated data. Public repository links and required upstream
 contributor/licence attribution remain. Run `python3 audit_release.py` to inspect
 the built archives before upload.
 
+## CPU view in io11
+
+The optional full logical-processor grid has been removed, together with its
+menu option and Shift+L shortcut. The standard CPU graph and compact core
+readings remain. Upgrades remove the retired setting and preserve the normal
+CPU graph choices and other display preferences.
+
 ## Added displays
 
 - Mounted disks retain capacity/usage alongside live read and write MiB/s and
   separate histories. Rates use measured elapsed time between kernel samples.
-- Optional logical processor histories, with a single-graph fallback when the
-  window cannot fit every processor.
 - A persistent GPU panel with four coloured Braille dot curves: GPU load,
   allocated VRAM, graphics clock and memory clock. Each character contains
   two horizontal points and four vertical dot levels.
@@ -58,8 +63,8 @@ sha256sum --ignore-missing -c SHA256SUMS
 ### Portable user installation (recommended on the existing Nova host)
 
 ```sh
-tar -xzf btop-nova-1.3.0-nova-io10-linux-amd64.tar.gz
-cd btop-nova-1.3.0-nova-io10-linux-amd64
+tar -xzf btop-nova-1.3.0-nova-io11-linux-amd64.tar.gz
+cd btop-nova-1.3.0-nova-io11-linux-amd64
 python3 install_nova.py
 ~/.local/bin/btop
 ```
@@ -85,7 +90,7 @@ Bash session. `/usr/bin/btop` remains available throughout.
 ### Ubuntu/Debian package
 
 ```sh
-sudo apt install ./btop-nova_1.3.0+nova.io9-1_amd64.deb
+sudo apt install ./btop-nova_1.3.0+nova.io11-1_amd64.deb
 btop-nova
 ```
 
@@ -103,7 +108,6 @@ sudo apt remove btop-nova
 
 | Key | Nova option |
 | --- | --- |
-| Shift+L | Logical processor grid / aggregate CPU |
 | Shift+N | Coloured GPU dot histories / previous GPU graph |
 | Shift+V | Independent GPU load and VRAM histogram |
 | Shift+U | Show/hide the GPU process summary |

@@ -75,10 +75,12 @@ with tempfile.TemporaryDirectory(prefix='.nova-package-test-', dir=root) as tmp:
     assert version in command(str(prefix/'bin/btop'),'--version')
     assert any((prefix/'share/btop-nova/releases').glob('*/share/btop/themes/*.theme'))
     saved = fresh_conf.read_text()
-    saved = re.sub(r'^cpu_logical_graphs = .*$', 'cpu_logical_graphs = False', saved, flags=re.M)
-    fresh_conf.write_text(saved)
+    saved = re.sub(r'^gpu_processes = .*$', 'gpu_processes = False', saved, flags=re.M)
+    fresh_conf.write_text(saved + '\ncpu_logical_graphs = True\n')
     command(*install)
-    assert fresh_conf.read_text() == saved
+    assert fresh_conf.read_text() == saved + '\n'
+    assert 'cpu_logical_graphs' not in values(fresh_conf)
+    saved = fresh_conf.read_text()
     assert bashrc.read_text().count('# BEGIN NOVA BTOP') == 1
     command('python3',str(folder/'rollback_nova.py'),'--prefix',str(prefix),'--bashrc',str(bashrc))
     assert not (prefix/'bin/btop').exists() and fresh_conf.read_text() == saved

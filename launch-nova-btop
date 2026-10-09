@@ -8,6 +8,7 @@ if [ ! -f "$XDG_CONFIG_HOME/btop/btop.conf" ]; then
 fi
 # Always open the combined capacity/usage/throughput view.
 sed -i 's/^io_mode = .*/io_mode = False/' "$XDG_CONFIG_HOME/btop/btop.conf"
+sed -i '/^cpu_logical_graphs[[:space:]]*=/d' "$XDG_CONFIG_HOME/btop/btop.conf"
 # Older running builds may save a config without this new preference.
 if ! grep -q '^show_zram[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
     printf '\n#* Zram compression and actual RAM cost.\nshow_zram = True\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"

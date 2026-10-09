@@ -35,7 +35,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-layout-', dir=root) as tmp:
     tmp = pathlib.Path(tmp)
     library = tmp / 'nvml'; library.mkdir()
     subprocess.run(['gcc', '-shared', '-fPIC', '-Wall', '-Wextra', '-Werror', str(root / 'tests/nova_nvml_fixture.c'), '-o', str(library / 'libnvidia-ml.so')], check=True)
-    common = dict(io_mode='False', proc_mounts='True', cpu_logical_graphs='False', show_boot_disks='False', gpu_always_visible='True', gpu_split_vram='True', gpu_nvtop_graph='True', gpu_processes='True', update_ms='500', shown_boxes='"cpu mem net proc gpu0"', cpu_bottom='False', mem_below_net='False', proc_left='False', swap_disk='False', proc_sorting='"pid"')
+    common = dict(io_mode='False', proc_mounts='True', show_boot_disks='False', gpu_always_visible='True', gpu_split_vram='True', gpu_nvtop_graph='True', gpu_processes='True', update_ms='500', shown_boxes='"cpu mem net proc gpu0"', cpu_bottom='False', mem_below_net='False', proc_left='False', swap_disk='False', proc_sorting='"pid"')
     baseline = Terminal(config_with(**common, nova_layout='False', show_swap='True'), tmp, library)
     try:
         old = boundaries(baseline)
@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-layout-', dir=root) as tmp:
         font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf', 13)
         preview = Image.new('RGB', (1600, (term.screen.lines+3)*17), '#101218')
         draw = ImageDraw.Draw(preview)
-        draw.text((8, 4), 'Nova io9 layout — synthetic GPU readings; local mounted filesystems; idle zram hidden', font=font, fill='white')
+        draw.text((8, 4), 'Nova io11 layout — synthetic GPU readings; local mounted filesystems; idle zram hidden', font=font, fill='white')
         for line in range(term.screen.lines):
             for col in range(term.screen.columns):
                 cell = term.screen.buffer[line][col]
@@ -92,8 +92,8 @@ with tempfile.TemporaryDirectory(prefix='.nova-layout-', dir=root) as tmp:
         assert row(term, '³net') == new['net'], term.text()
         term.key('M'); full_mounts(term)
         term.key('L')
-        assert len(set(re.findall(r'\bCPU(\d+)\b', term.text()))) == 32, term.text()
-        assert boundaries(term)['gpu'] == 18, term.text()
+        assert not re.search(r'\bCPU\d+\b', term.text()), term.text()
+        assert boundaries(term) == new, term.text()
         full_mounts(term)
         term.key('L'); assert boundaries(term)['gpu'] == new['gpu']
         term.key('B'); assert 'efi' in '\n'.join(term.screen.display[new['mem']:bottom]), term.text()
@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-layout-', dir=root) as tmp:
                 assert 'MOUNTED ON' not in term.text(), term.text()
                 assert 'GPU processes ' not in term.text(), term.text()
             elif width >= 146: full_mounts(term)
-        print('Shared table mouse bounds, details, toggles, logical-grid preservation, help and shrink/grow fallback passed', flush=True)
+        print('Shared table mouse bounds, details, toggles, standard CPU preservation, help and shrink/grow fallback passed', flush=True)
         for _ in range(4):
             term.key('p')
             assert 'gpu0' in term.text(), term.text()

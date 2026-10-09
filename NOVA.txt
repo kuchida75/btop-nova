@@ -10,11 +10,10 @@ normal disk mode each time. Press i to toggle the optional I/O-only view.
 Nova layout (io7):
 The Nova profile gives GPU histories more height by shortening the aggregate
 CPU panel. It keeps the combined CPU/GPU height unchanged so lower panels do
-not lose space. An enabled logical-processor grid that already fits continues
-to fit; otherwise the existing single-graph fallback remains available.
+not lose space.
 At 200 columns by 100 rows, aggregate CPU shrinks from 21 to 14 rows and GPU
 grows from 21 to 28. The seven additional rows go to the plot above its process
-table. With 32 logical CPU graphs enabled, CPU uses 18 rows and GPU uses 24.
+table.
 
 The mount table now spans the entire bottom width beneath memory, network and
 processes. Its wider usage bars fill the available space, while local
@@ -32,7 +31,7 @@ there is insufficient space. Shift+B can give boot/EFI cards more memory rows.
 Options > GENERAL > nova_layout = False restores the previous panel allocation
 and the mount table under processes. Options > MEM > show_swap controls whether
 swap is shown; swap_disk can also display it as a disk. Subsequent upgrades
-preserve these choices and the chosen aggregate/logical CPU view.
+preserve these choices and the normal CPU graph settings.
 
 To activate a rebuilt release in the existing user installation, close the
 running btop, then run this checkout's install_nova.py with python3 and launch
@@ -73,18 +72,12 @@ plus /proc/swaps. No zramctl subprocess, elevated privileges, zram configuration
 changes, writeback, compaction or induced swapping are needed. Kernel ABI:
 https://docs.kernel.org/admin-guide/blockdev/zram.html#stats
 
-Optional logical processor view:
-Shift+L toggles a Windows Task Manager style grid: one 0–100% history for each
-logical processor, labelled CPU0, CPU1, etc. The CPU panel uses the whole width
-for the grid, with model, total load, frequency and temperature above it.
-Uptime and a compact GPU summary (if enabled) remain available below it.
-Options > CPU > cpu_logical_graphs also controls this preference.
-
-If all processors cannot fit with readable labels and at least one graph row,
-the panel automatically uses a single total CPU graph. Enlarging the window
-restores the grid, without changing the saved preference. Disabling the option
-restores the previous upper/lower CPU graph settings. The portable configuration enables this optional view initially;
-subsequent choices persist across launches and upgrades.
+Standard CPU view (io11):
+The optional full logical-processor grid has been removed, including its menu
+option and Shift+L shortcut. The usual total CPU history and compact core
+readings remain, with the normal upper/lower graph settings. The installer
+and launchers remove the retired cpu_logical_graphs key from older profiles.
+The binary ignores this old key if started directly. Other preferences persist.
 
 Mounted filesystem table (Linux):
 The bottom of the body contains a live duf-style table of local
@@ -231,11 +224,11 @@ I/O graph modes, help redraws and live resizing. Its output is in
 test-ui-results.txt. Default installation and rollback were staged and tested
 inside production-stage before installing outside the workspace.
 
-CPU grid validation: tests/nova_cpu_grid.cpp checks fit and bounds for
-1–1024 processors. test_cpu_grid.py verifies all 32 histories, a pinned CPU
-load, native braille/block/TTY symbols, Shift+L, shrink/grow restoration, help
-redraw and preference persistence in a real terminal. Output is in
-test-cpu-results.txt.
+CPU validation: test_cpu_standard.py verifies that an older enabled grid key
+cannot activate the removed view, Shift+L has no effect, the standard CPU
+readings survive resize and braille/block/TTY styles, and the retired setting
+is absent after a normal config save. Installer and package tests also check
+migration without changing the retained CPU/GPU/mount preferences.
 
 GPU/boot validation: test_gpu_boot.py verifies live boot/EFI collection from
 Nova's mounted partitions, visibility persistence and the unchanged disk
@@ -285,11 +278,11 @@ test_gpu_dots.py renders a dense four-colour simulated history, checks both
 dot columns, inherited TTY symbols and small-window restoration, and exports
 nova-gpu-dots-preview.png. Results: test-gpu-dots-results.txt.
 
-Layout validation: tests/nova_layout.cpp checks CPU grid preservation, compact
+Layout validation: tests/nova_layout.cpp checks compact CPU,
 memory and minimum network budgets, full-width columns and mount table bounds.
 test_layout.py drives a real terminal at 200x100, 146x96, 110x60 and 80x35; it
 checks the CPU/GPU height transfer, larger network area, every mounted device
-path, all 32 logical histories, table mouse bounds, process details, boot/EFI
+path, standard CPU behavior, table mouse bounds, process details, boot/EFI
 cards, help, presets, CPU-bottom, process-left, network-above-memory and hidden
 panels. It verifies short-window fallback and restoration. Results are in
 test-layout-results.txt; nova-layout-preview.png labels synthetic GPU readings.

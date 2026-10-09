@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-zram-', dir=root) as tmp:
 
     library = tmp/'nvml'; library.mkdir()
     subprocess.run(['gcc', '-shared', '-fPIC', '-Wall', '-Wextra', '-Werror', str(root/'tests/nova_nvml_fixture.c'), '-o', str(library/'libnvidia-ml.so')], check=True)
-    common = dict(io_mode='False', show_zram='True', show_swap='False', swap_disk='False', nova_layout='True', cpu_logical_graphs='False', proc_mounts='True', shown_boxes='"cpu mem net proc gpu0"', gpu_always_visible='True', gpu_nvtop_graph='True', gpu_processes='True', update_ms='500', mem_below_net='False', cpu_bottom='False', proc_left='False', base_10_sizes='False')
+    common = dict(io_mode='False', show_zram='True', show_swap='False', swap_disk='False', nova_layout='True', proc_mounts='True', shown_boxes='"cpu mem net proc gpu0"', gpu_always_visible='True', gpu_nvtop_graph='True', gpu_processes='True', update_ms='500', mem_below_net='False', cpu_bottom='False', proc_left='False', base_10_sizes='False')
 
     # Match live visibility to actual usage; background applications may swap
     # between runs. Known active/idle transitions are tested with the shim.
