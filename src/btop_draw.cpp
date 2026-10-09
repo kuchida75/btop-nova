@@ -26,7 +26,6 @@ tab-size = 4
 
 #include "btop_draw.hpp"
 #include "btop_config.hpp"
-#include "btop_cpu_grid.hpp"
 #include "btop_mounts.hpp"
 #include "btop_nova_layout.hpp"
 #include "btop_theme.hpp"
@@ -548,10 +547,7 @@ namespace Cpu {
 		if (Runner::stopping) return "";
 		if (force_redraw) redraw = true;
 		bool show_temps = (Config::getB("check_temp") and got_sensors);
-		const bool logical_requested = Config::getB("cpu_logical_graphs");
-		// A requested grid uses the whole CPU panel. The compact fallback is
-		// one total-CPU graph, regardless of the upper/lower graph settings.
-		auto single_graph = logical_requested or Config::getB("cpu_single_graph");
+		auto single_graph = Config::getB("cpu_single_graph");
 		bool hide_cores = show_temps and (cpu_temp_only or not Config::getB("show_coretemp"));
 		const int extra_width = (hide_cores ? max(6, 6 * b_column_size) : 0);
 	#ifdef GPU_SUPPORT
@@ -564,7 +560,6 @@ namespace Cpu {
 		auto graph_up_field = Config::getS("cpu_graph_upper");
 		if (graph_up_field == "Auto" or not v_contains(Cpu::available_fields, graph_up_field))
 			graph_up_field = "total";
-		if (logical_requested) graph_up_field = "total";
 		auto graph_lo_field = Config::getS("cpu_graph_lower");
 		if (graph_lo_field == "Auto" or not v_contains(Cpu::available_fields, graph_lo_field)) {
 		#ifdef GPU_SUPPORT
@@ -764,54 +759,6 @@ namespace Cpu {
 		}
 
 		try {
-		// Logical processor graphs replace the aggregate graph and core list.
-		bool gpu_footer = false;
-	#ifdef GPU_SUPPORT
-		gpu_footer = show_gpu and not gpus.empty();
-	#endif
-		const auto logical_layout = logical_grid_layout(width - 4, height - 4 - gpu_footer, (int)cpu.core_percent.size());
-		if (logical_requested and logical_layout) {
-			// Clear the old aggregate statistics box too, on every update: idle
-			// graph cells use cursor movement and must not retain old pixels.
-			for (int row = 1; row < height - 1; ++row)
-				out += Mv::to(y + row, x + 1) + string(width - 2, ' ');
-			string summary = (Config::getS("custom_cpu_name").empty() ? cpuName : Config::getS("custom_cpu_name"))
-				+ " | Total " + to_string(cpu.cpu_percent.at("total").back()) + "%";
-			if (Config::getB("show_cpu_freq") and not cpuHz.empty()) summary += " | " + cpuHz;
-			if (show_temps and not cpu.temp.empty() and not cpu.temp[0].empty()) {
-				const auto [temp, unit] = celsius_to(cpu.temp[0].back(), temp_scale);
-				summary += " | " + to_string(temp) + unit;
-			}
-			out += Mv::to(y + 1, x + 2) + Theme::c("title") + Fx::b + uresize(summary, width - 4) + Fx::ub;
-			for (int index = 0; index < (int)cpu.core_percent.size(); ++index) {
-				const auto& history = cpu.core_percent[index];
-				const int cell_x = x + 2 + (index % logical_layout.columns) * (logical_layout.cell_width + 1);
-				const int cell_y = y + 2 + (index / logical_layout.columns) * (logical_layout.cell_height + 1);
-				out += Draw::createBox(cell_x, cell_y, logical_layout.cell_width, logical_layout.cell_height, Theme::c("div_line"), false);
-				const string label = "CPU" + to_string(index) + " " + (history.empty() ? "--" : to_string(history.back())) + "%";
-				out += Mv::to(cell_y + 1, cell_x + 1) + Theme::c("main_fg") + label;
-				if (not history.empty()) {
-					Draw::Graph graph{logical_layout.cell_width - 2, logical_layout.cell_height - 3, "cpu", history, graph_symbol, false, false, 100};
-					out += Mv::to(cell_y + 2, cell_x + 1) + graph();
-				}
-			}
-			string footer = to_string(cpu.core_percent.size()) + " logical processors | Shift+L: total";
-			if (Config::getB("show_uptime")) footer += " | up " + sec_to_dhms(system_uptime());
-			out += Mv::to(y + height - 2 - gpu_footer, x + 2) + Theme::c("main_fg") + uresize(footer, width - 4);
-		#ifdef GPU_SUPPORT
-			if (gpu_footer) {
-				string gpu_summary;
-				for (size_t i = 0; i < gpus.size(); ++i) {
-					const auto& gpu = gpus[i];
-					gpu_summary += "GPU" + to_string(i) + " " + (gpu.gpu_percent.at("gpu-totals").empty() ? "--" : to_string(gpu.gpu_percent.at("gpu-totals").back())) + "% ";
-				}
-				out += Mv::to(y + height - 2, x + 2) + uresize(gpu_summary, width - 4);
-			}
-		#endif
-			redraw = false;
-			return out + Fx::reset;
-		}
-
 		//? Cpu/Gpu graphs
 		out += Fx::ub + Mv::to(y + 1, x + 1);
 		auto draw_graphs = [&](vector<Draw::Graph>& graphs, const int graph_height, const int graph_width, const string& graph_field) {
@@ -2360,7 +2307,7 @@ namespace Draw {
 			if (height <= Term::height-gpus_height_offset) height += gpus_height_offset;
 			if (nova_layout and Gpu::shown > 0 and (Mem::shown or Net::shown or Proc::shown)) {
 				const int previous = height;
-				height = NovaLayout::cpu_height(previous, width, Shared::coreCount, Config::getB("cpu_logical_graphs"), gpus_shown_in_cpu_panel);
+				height = NovaLayout::cpu_height(previous);
 				balanced_gpu_height = (previous + max(Gpu::min_height, previous) * Gpu::shown - height) / Gpu::shown;
 			}
 			if (height - gpus_extra_height < 7) gpus_extra_height = height - 7;

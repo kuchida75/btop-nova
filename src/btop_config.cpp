@@ -128,8 +128,6 @@ namespace Config {
 
 		{"cpu_single_graph", 	"#* Set to True to completely disable the lower CPU graph."},
 
-		{"cpu_logical_graphs", 	"#* Show a graph for each logical processor. Falls back to a single total CPU graph when the panel is too small. Toggle with Shift+L."},
-
 		{"cpu_bottom",			"#* Show cpu box at bottom of screen instead of top."},
 
 		{"show_uptime", 		"#* Shows the system uptime in the CPU box."},
@@ -285,7 +283,6 @@ namespace Config {
 		{"proc_filter_kernel", false},
 		{"cpu_invert_lower", true},
 		{"cpu_single_graph", false},
-		{"cpu_logical_graphs", false},
 		{"cpu_bottom", false},
 		{"show_uptime", true},
 		{"check_temp", true},

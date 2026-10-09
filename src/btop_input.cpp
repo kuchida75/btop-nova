@@ -449,13 +449,7 @@ namespace Input {
 				bool redraw = true;
 				static uint64_t last_press = 0;
 
-				if (key == "L") {
-					Config::flip("cpu_logical_graphs");
-					Draw::calcSizes();
-					Runner::run("all", true, true);
-					return;
-				}
-				else if (key == "+" and Config::getI("update_ms") <= 86399900) {
+				if (key == "+" and Config::getI("update_ms") <= 86399900) {
 					int add = (Config::getI("update_ms") <= 86399000 and last_press >= time_ms() - 200
 						and rng::all_of(Input::history, [](const auto& str){ return str == "+"; })
 						? 1000 : 100);

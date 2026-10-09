@@ -1,16 +1,13 @@
 /* Copyright 2026. Licensed under the Apache License, Version 2.0. */
 #pragma once
-#include "btop_cpu_grid.hpp"
+#include <algorithm>
 
 namespace NovaLayout {
 
 // Transfer unused aggregate-CPU height to GPU histories, keeping the combined
-// budget unchanged. A grid that already fits must continue to fit.
-inline int cpu_height(int previous, int width, int processors, bool logical, int footer) {
-	int result = std::max(8, previous - previous / 3);
-	if (logical and Cpu::logical_grid_layout(width - 4, previous - 4 - footer, processors))
-		while (result < previous and not Cpu::logical_grid_layout(width - 4, result - 4 - footer, processors)) ++result;
-	return std::min(previous, result);
+// budget unchanged.
+inline int cpu_height(int previous) {
+	return std::min(previous, std::max(8, previous - previous / 3));
 }
 
 inline int memory_height(int previous, int available, int minimum, int network_minimum, bool swap_visible) {
