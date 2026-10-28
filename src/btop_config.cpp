@@ -148,6 +148,8 @@ namespace Config {
 		{"base_10_sizes",		"#* Use base 10 for bits/bytes sizes, KB = 1000 instead of KiB = 1024."},
 
 		{"show_cpu_freq", 		"#* Show CPU frequency."},
+		{"show_cpu_power", "#* (Linux) CPU package watts and an upward CPU/power history. RAPL energy counters need read access."},
+		{"show_core_freq", 		"#* Show per-thread MHz in up to three columns; Shift+F toggles. Small windows use the normal CPU view."},
 
 		{"clock_format", 		"#* Draw a clock at top of screen, formatting according to strftime, empty string to disable.\n"
 								"#* Special formatting: /host = hostname | /user = username | /uptime = system uptime"},
@@ -230,7 +232,7 @@ namespace Config {
 	};
 
 	std::unordered_map<std::string_view, string> strings = {
-		{"color_theme", "Default"},
+		{"color_theme", "Nova"},
 		{"shown_boxes", "cpu mem net proc"},
 		{"graph_symbol", "braille"},
 		{"presets", "cpu:1:default,proc:0:default cpu:0:default,mem:0:default,net:0:default cpu:0:block,net:0:tty"},
@@ -274,7 +276,7 @@ namespace Config {
 		{"proc_reversed", false},
 		{"proc_tree", false},
 		{"proc_colors", true},
-		{"proc_gradient", true},
+		{"proc_gradient", false},
 		{"proc_per_core", false},
 		{"proc_mem_bytes", true},
 		{"proc_cpu_graphs", true},
@@ -288,6 +290,8 @@ namespace Config {
 		{"check_temp", true},
 		{"show_coretemp", true},
 		{"show_cpu_freq", true},
+		{"show_core_freq", false},
+		{"show_cpu_power", false},
 		{"background_update", true},
 		{"mem_graphs", true},
 		{"mem_below_net", false},

@@ -4,6 +4,7 @@ import argparse, hashlib, json, os, pathlib, re, shlex, shutil, subprocess, time
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--prefix',type=pathlib.Path,default=pathlib.Path.home()/'.local')
 parser.add_argument('--bashrc',type=pathlib.Path,default=pathlib.Path.home()/'.bashrc')
+parser.add_argument('--apply-theme',action='store_true',help='Apply the Nova palette and readable process rows; back up the existing profile.')
 args=parser.parse_args()
 source=pathlib.Path(__file__).resolve().parent
 prefix=args.prefix.resolve(); bashrc=args.bashrc.resolve()
@@ -43,6 +44,11 @@ for themes in (source/'share/btop/themes',source/'themes'):
 # Enable new preferences once, preserving later choices across upgrades.
 config_file=config/'btop.conf'
 config_text=config_file.read_text()
+if args.apply_theme:
+    shutil.copy2(config_file,backups/f'config-{time.time_ns()}')
+    for key, value in {'color_theme':'"Nova"', 'proc_gradient':'False'}.items():
+        line=f'{key} = {value}'
+        config_text=re.sub(r'^'+key+r'\s*=.*$',line,config_text,flags=re.M) if re.search(r'^'+key+r'\s*=',config_text,flags=re.M) else config_text+'\n'+line+'\n'
 # Remove the retired grid preference; retain the normal CPU graph choices.
 config_text=re.sub(r'^cpu_logical_graphs\s*=.*\n?', '', config_text, flags=re.M)
 # Apply the requested swap-display change once, alongside the new layout.
@@ -52,6 +58,8 @@ if not re.search(r'^nova_layout\s*=',config_text,flags=re.M):
         line=f'{key} = False'
         config_text=re.sub(r'^'+key+r'\s*=.*$',line,config_text,flags=re.M) if re.search(r'^'+key+r'\s*=',config_text,flags=re.M) else config_text+'\n'+line+'\n'
 new_preferences = {
+    'show_core_freq': ('False', 'Optional per-thread MHz in three columns; Shift+F toggles.'),
+    'show_cpu_power': ('False', 'Optional CPU package watts and upward CPU/power history; needs readable RAPL counters.'),
     'show_zram': ('True', 'Zram compression, actual RAM cost and net savings; Shift+Z toggles.'),
     'nova_layout': ('True', 'More GPU height, compact memory and a full-width bottom mount table.'),
     'proc_mounts': ('True', 'Live local mount table below processes; Shift+M toggles.'),

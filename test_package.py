@@ -44,16 +44,20 @@ with tempfile.TemporaryDirectory(prefix='.nova-package-test-', dir=root) as tmp:
     assert 'Package: btop-nova\n' in metadata and 'Architecture: amd64\n' in metadata
     assert 'Depends: '+manifest['depends'] in metadata
     assert set(p.name for p in control.iterdir()) == {'control','md5sums'} # no maintainer scripts
+    assert (extracted/'usr/share/doc/btop-nova/INSTALL_NOVA_PC.md').is_file()
+    assert (extracted/'usr/share/doc/btop-nova/prepare_cpu_power_access.py').is_file()
     assert not (extracted/'usr/bin/btop').exists() and not (extracted/'etc').exists()
     subprocess.run(['md5sum','-c',str(control/'md5sums')], cwd=extracted, check=True, stdout=subprocess.DEVNULL)
     lookup = extracted/'usr/lib/btop-nova/share/btop/themes'
     assert lookup.is_dir() and lookup.resolve() == (extracted/'usr/share/btop-nova/themes').resolve()
+    assert (lookup/'Nova.theme').is_file()
     home = tmp/'home'; home.mkdir()
     env = dict(os.environ, HOME=str(home), XDG_CONFIG_HOME=str(tmp/'profile'))
     wrapper = extracted/'usr/bin/btop-nova'
     assert version in command(str(wrapper),'--version',env=env)
     conf = tmp/'profile/btop-nova/btop/btop.conf'
     assert values(conf)['disks_filter'] == '""' and values(conf)['gpu_nvtop_graph'] == 'True'
+    assert values(conf)['color_theme'] == '"Nova"' and values(conf)['proc_gradient'] == 'False'
     conf.write_text(conf.read_text()+'\n# Keep this user preference\n')
     saved = conf.read_text()
     command(str(wrapper),'--version',env=env)
@@ -65,6 +69,8 @@ with tempfile.TemporaryDirectory(prefix='.nova-package-test-', dir=root) as tmp:
         tar.extractall(tmp/'portable', filter='data')
     folder = next((tmp/'portable').iterdir())
     assert digest(folder/'bin/btop') == manifest['binary_sha256']
+    assert (folder/'INSTALL_NOVA_PC.md').is_file()
+    assert (folder/'prepare_cpu_power_access.py').is_file()
     user = tmp/'fresh user'; user.mkdir()
     prefix = user/'local'; bashrc = user/'bashrc'
     bashrc.write_text('# User shell\n')
@@ -72,6 +78,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-package-test-', dir=root) as tmp:
     command(*install)
     fresh_conf = prefix/'share/btop-nova/config/btop/btop.conf'
     assert values(fresh_conf)['disks_filter'] == '""'
+    assert values(fresh_conf)['color_theme'] == '"Nova"'
     assert version in command(str(prefix/'bin/btop'),'--version')
     assert any((prefix/'share/btop-nova/releases').glob('*/share/btop/themes/*.theme'))
     saved = fresh_conf.read_text()
@@ -89,7 +96,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-package-test-', dir=root) as tmp:
 
     with tarfile.open(source) as tar:
         names = tar.getnames(); top = 'btop-nova-'+version+'-source/'
-        for name in ('Makefile','package_nova.py','README_NOVA.md','LICENSE','packaging/default.conf','src/btop_gpu_history.hpp','src/btop_zram.hpp'):
+        for name in ('Makefile','package_nova.py','README_NOVA.md','INSTALL_NOVA_PC.md','prepare_cpu_power_access.py','LICENSE','packaging/default.conf','src/btop_gpu_history.hpp','src/btop_zram.hpp'):
             assert top+name in names, name
         assert not any('/bin/btop' in name or '/dist/' in name or 'test-screen-' in name for name in names)
         assert tar.extractfile(top+'src/btop.cpp').read() == (root/'src/btop.cpp').read_bytes()

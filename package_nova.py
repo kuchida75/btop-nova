@@ -83,7 +83,7 @@ def package(args):
         portable = temporary/(stem+'-linux-amd64')
         (portable/'bin').mkdir(parents=True)
         shutil.copy2(binary, portable/'bin/btop')
-        for filename in ('install_nova.py', 'rollback_nova.py', 'NOVA.txt', 'README_NOVA.md', 'LICENSE'):
+        for filename in ('install_nova.py', 'rollback_nova.py', 'NOVA.txt', 'README_NOVA.md', 'INSTALL_NOVA_PC.md', 'prepare_cpu_power_access.py', 'LICENSE'):
             shutil.copy2(ROOT/filename, portable/filename)
         (portable/'packaging').mkdir()
         shutil.copy2(ROOT/'packaging/default.conf', portable/'packaging/default.conf')
@@ -111,7 +111,7 @@ def package(args):
         lookup = deb/'usr/lib/btop-nova/share/btop'; lookup.mkdir(parents=True)
         (lookup/'themes').symlink_to('../../../../share/btop-nova/themes')
         doc = deb/'usr/share/doc/btop-nova'; doc.mkdir(parents=True)
-        for filename in ('NOVA.txt', 'README_NOVA.md', 'LICENSE'):
+        for filename in ('NOVA.txt', 'README_NOVA.md', 'INSTALL_NOVA_PC.md', 'prepare_cpu_power_access.py', 'LICENSE'):
             shutil.copy2(ROOT/filename, doc/filename)
         shutil.copy2(ROOT/'include/fmt/LICENSE.rst', doc/'fmt-license.txt')
         shutil.copy2(ROOT/'packaging/licenses/widecharwidth.txt', doc/'widecharwidth-license.txt')

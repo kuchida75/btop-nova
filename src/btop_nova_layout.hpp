@@ -17,4 +17,11 @@ inline int memory_height(int previous, int available, int minimum, int network_m
 	return std::clamp(target, minimum, maximum);
 }
 
+// Fit the per-core table without absorbing spare network/process rows.
+// A zero result retains the ordinary layout when the complete view cannot fit.
+inline int focus_cpu_height(int total, int gpu_height, int cpu_minimum, int body_minimum) {
+	const int available = total - gpu_height - body_minimum;
+	return available >= cpu_minimum ? cpu_minimum : 0;
+}
+
 }

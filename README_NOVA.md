@@ -1,7 +1,7 @@
 # Nova btop
 
 A Linux fork of [aristocratos/btop](https://github.com/aristocratos/btop), based
-on upstream v1.3.0. Current Nova version: **1.3.0-nova-io11**.
+on upstream v1.3.0. Current Nova version: **1.3.0-nova-io18**.
 
 ## AI disclosure and release privacy
 
@@ -16,6 +16,29 @@ preview uses simulated data. Public repository links and required upstream
 contributor/licence attribution remain. Run `python3 audit_release.py` to inspect
 the built archives before upload.
 
+## Nova theme
+
+The default Nova theme uses a dark slate background, light text and matching
+panel borders. Activity and incoming I/O are cyan; used memory and outgoing
+I/O are blue. GPU clock curves use lavender and green, with matching legends.
+Tables use neutral headings and identity text; only metrics and alerts are
+coloured. Capacity is green below 80% used, amber from 80%, and red from 90%.
+Small boot/EFI partitions use those same percentage thresholds.
+
+Choose a theme in **Options → GENERAL → color_theme**. The GPU curves, mount
+table and zram summary follow the selection, including older theme files.
+16-colour and 256-colour fallbacks keep the same colour roles.
+
+To apply Nova to an existing installation, run:
+
+```sh
+python3 install_nova.py --apply-theme
+```
+
+This backs up the profile, selects Nova and disables process
+row fading. Other preferences remain, and later ordinary upgrades preserve
+your theme choice. Fresh installations already use Nova.
+
 ## CPU view in io11
 
 The optional full logical-processor grid has been removed, together with its
@@ -25,6 +48,32 @@ CPU graph choices and other display preferences.
 
 ## Added displays
 
+- Optional CPU package watts and an upward CPU/power dot history via
+  **Options → CPU → show_cpu_power**. CPU load uses 0–100%; watts use a labelled
+  scale in steps of 50 W. Narrow views keep the regular CPU history and numeric
+  watts where space permits. Linux RAPL counters need read access; missing
+  readings show `--W` and leave gaps. Values average package energy over the
+  refresh interval and exclude other system power. Generic defaults keep it off.
+  For read access after reboot, the optional `prepare_cpu_power_access.py`
+  helper prepares a scoped udev rule for administrator installation; see the
+  [Nova PC guide](INSTALL_NOVA_PC.md#keep-cpu-watts-working-after-reboot).
+- **cpu_single_graph=True** selects one ordinary upward CPU graph. Power mode
+  also uses a single upward chart; it never mirrors the watt trace.
+- Optional per-thread MHz beside CPU usage, in up to three columns. A
+  32-thread CPU uses 11 rows, with available temperatures retained. **Shift+F**
+  or **Options → CPU → show_core_freq** toggles it; generic defaults keep it off.
+- With MHz and Nova layout enabled, the full CPU/GPU/memory/network/process
+  view fits the CPU panel to its per-core table: 17 rows for 32 threads.
+  Spare vertical space goes to network graphs and the process viewport.
+  GPU height and the full-width mounts table are retained. Memory and disk
+  rows are reserved when needed; short windows restore the ordinary layout.
+  Process sorting, scrolling, filtering and details keep their existing behavior.
+- Three compact value columns leave the remaining width to the CPU history.
+  All 32 readings and temperatures fit at 87 columns with a 17-row CPU panel.
+
+- A consistent app-wide palette with readable tables and shared metric colours.
+- Wider GPU histories with a compact statistics panel: approximately one third
+  of the width, bounded to 41–52 columns so small windows retain readable values.
 - Mounted disks retain capacity/usage alongside live read and write MiB/s and
   separate histories. Rates use measured elapsed time between kernel samples.
 - A persistent GPU panel with four coloured Braille dot curves: GPU load,
@@ -46,8 +95,15 @@ must include Braille glyphs. ASCII dot fallback is available in TTY mode.
 
 ## Download and install
 
-Download the versioned files from
+For a source installation from GitHub or your Gitea mirror, follow
+[Install on Nova PC](INSTALL_NOVA_PC.md). Build locally, preview separately,
+then install the isolated user command and select the CPU layout. The guide
+also covers a saved Wi-Fi interface and optional coloured CPU wattage history.
+
+Published binary releases are available from
 [GitHub Releases](https://github.com/kuchida75/btop-nova/releases).
+Source branch changes can be newer than downloadable releases; use the Nova PC
+guide for the current branch.
 The supplied binary targets **Linux x86-64**, with dynamically loaded GPU
 support. It requires **glibc 2.38 or newer** and **libstdc++ providing
 GLIBCXX_3.4.32**. The `.deb` records the precise dependencies calculated from
@@ -63,8 +119,8 @@ sha256sum --ignore-missing -c SHA256SUMS
 ### Portable user installation (recommended on the existing Nova host)
 
 ```sh
-tar -xzf btop-nova-1.3.0-nova-io11-linux-amd64.tar.gz
-cd btop-nova-1.3.0-nova-io11-linux-amd64
+tar -xzf btop-nova-1.3.0-nova-io18-linux-amd64.tar.gz
+cd btop-nova-1.3.0-nova-io18-linux-amd64
 python3 install_nova.py
 ~/.local/bin/btop
 ```
@@ -90,7 +146,7 @@ Bash session. `/usr/bin/btop` remains available throughout.
 ### Ubuntu/Debian package
 
 ```sh
-sudo apt install ./btop-nova_1.3.0+nova.io11-1_amd64.deb
+sudo apt install ./btop-nova_1.3.0+nova.io18-1_amd64.deb
 btop-nova
 ```
 
@@ -106,8 +162,18 @@ sudo apt remove btop-nova
 
 ## Controls
 
+Click **keys** beside the CPU panel's menu/preset buttons, or open **menu →
+Help (Keyboard shortcuts)**, to see the complete reference. **F1**, **?** and
+**h** also open it (**Shift+H** in Vim mode). The keys button is shown at
+100 columns or wider; the menu and keyboard entry points work at 80×24.
+
+The reference groups global controls, GPU, disk/network, processes, editing,
+options and Vim mode. Use **PgUp/PgDn**, arrows or the clickable **Prev/Next**
+buttons to browse; **Home/End** jump to the first/last page. **Esc** closes it.
+
 | Key | Nova option |
 | --- | --- |
+| Shift+F | Per-thread MHz / normal CPU view |
 | Shift+N | Coloured GPU dot histories / previous GPU graph |
 | Shift+V | Independent GPU load and VRAM histogram |
 | Shift+U | Show/hide the GPU process summary |

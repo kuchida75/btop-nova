@@ -68,6 +68,8 @@ namespace Input {
 		{"[Z",		"shift_tab"},
 		{"OP",		"f1"},
 		{"OQ",		"f2"},
+		{"[11~",	"f1"},
+		{"[12~",	"f2"},
 		{"OR",		"f3"},
 		{"OS",		"f4"},
 		{"[15~",	"f5"},
@@ -121,7 +123,7 @@ namespace Input {
 		string key = input;
 		if (not key.empty()) {
 			//? Remove escape code prefix if present
-			if (key.substr(0, 2) == Fx::e) {
+			if (key.size() > 1 and key.front() == '\x1b' and (key[1] == '[' or key[1] == 'O')) {
 				key.erase(0, 1);
 			}
 			//? Detect if input is an mouse event
@@ -220,12 +222,19 @@ namespace Input {
 					Menu::show(Menu::Menus::Main);
 					return;
 				}
-				else if (is_in(key, "F1", "?", help_key)) {
+				else if (is_in(key, "f1", "F1", "?", help_key)) {
 					Menu::show(Menu::Menus::Help);
 					return;
 				}
-				else if (is_in(key, "F2", "o")) {
+				else if (is_in(key, "f2", "F2", "o")) {
 					Menu::show(Menu::Menus::Options);
+					return;
+				}
+				else if (key == "F") {
+					atomic_wait(Runner::active);
+					Config::flip("show_core_freq");
+					Draw::calcSizes();
+					Runner::run("all", false, true);
 					return;
 				}
 				else if (key.size() == 1 and isint(key)) {

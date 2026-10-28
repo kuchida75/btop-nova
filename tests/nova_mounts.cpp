@@ -9,6 +9,12 @@ int main(int argc, char**) {
 			std::cout << row.mountpoint << '\t' << row.total << '\t' << row.used << '\t' << row.available << '\t' << row.fstype << '\t' << row.device << '\n';
 		return 0;
 	}
+	assert(std::string(Mounts::capacity_status(0.6)) == "status_ok");
+	assert(std::string(Mounts::capacity_status(79.9)) == "status_ok");
+	assert(std::string(Mounts::capacity_status(80)) == "status_warning");
+	assert(std::string(Mounts::capacity_status(89.9)) == "status_warning");
+	assert(std::string(Mounts::capacity_status(90)) == "status_critical");
+	assert(std::string(Mounts::capacity_status(100)) == "status_critical");
 	std::istringstream sample(
 		"1 0 8:1 / / rw - ext4 /dev/sda1 rw\n"
 		"2 1 8:2 / /boot rw shared:1 - ext4 /dev/sda2 rw\n"

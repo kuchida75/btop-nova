@@ -88,52 +88,66 @@ namespace Theme {
 		{ "upload_end", "#dcafde" },
 		{ "process_start", "#80d0a3" },
 		{ "process_mid", "#dcd179" },
-		{ "process_end", "#d45454" }
+		{ "process_end", "#d45454" },
+		{ "gpu_load", "#77ca9b" },
+		{ "gpu_vram", "#d9626d" },
+		{ "gpu_clock", "#74e6fc" },
+		{ "gpu_mem_clock", "#b5e685" },
+		{ "status_ok", "#b5e685" },
+		{ "status_warning", "#cbc06c" },
+		{ "status_critical", "#dc4c4c" }
 	};
 
 	const std::unordered_map<string, string> TTY_theme = {
 		{ "main_bg", "\x1b[0;40m" },
 		{ "main_fg", "\x1b[37m" },
 		{ "title", "\x1b[97m" },
-		{ "hi_fg", "\x1b[91m" },
-		{ "selected_bg", "\x1b[41m" },
+		{ "hi_fg", "\x1b[96m" },
+		{ "selected_bg", "\x1b[44m" },
 		{ "selected_fg", "\x1b[97m" },
 		{ "inactive_fg", "\x1b[90m" },
-		{ "graph_text", "\x1b[90m" },
+		{ "graph_text", "\x1b[37m" },
 		{ "meter_bg", "\x1b[90m" },
-		{ "proc_misc", "\x1b[92m" },
-		{ "cpu_box", "\x1b[32m" },
-		{ "mem_box", "\x1b[33m" },
-		{ "net_box", "\x1b[35m" },
-		{ "proc_box", "\x1b[31m" },
+		{ "proc_misc", "\x1b[96m" },
+		{ "cpu_box", "\x1b[90m" },
+		{ "mem_box", "\x1b[90m" },
+		{ "net_box", "\x1b[90m" },
+		{ "proc_box", "\x1b[90m" },
 		{ "div_line", "\x1b[90m" },
-		{ "temp_start", "\x1b[94m" },
-		{ "temp_mid", "\x1b[96m" },
-		{ "temp_end", "\x1b[95m" },
-		{ "cpu_start", "\x1b[92m" },
-		{ "cpu_mid", "\x1b[93m" },
-		{ "cpu_end", "\x1b[91m" },
-		{ "free_start", "\x1b[32m" },
+		{ "gpu_load", "\x1b[96m" },
+		{ "gpu_vram", "\x1b[94m" },
+		{ "gpu_clock", "\x1b[95m" },
+		{ "gpu_mem_clock", "\x1b[92m" },
+		{ "status_ok", "\x1b[92m" },
+		{ "status_warning", "\x1b[93m" },
+		{ "status_critical", "\x1b[91m" },
+		{ "temp_start", "\x1b[92m" },
+		{ "temp_mid", "\x1b[93m" },
+		{ "temp_end", "\x1b[91m" },
+		{ "cpu_start", "\x1b[96m" },
+		{ "cpu_mid", "" },
+		{ "cpu_end", "\x1b[96m" },
+		{ "free_start", "\x1b[92m" },
 		{ "free_mid", "" },
 		{ "free_end", "\x1b[92m" },
-		{ "cached_start", "\x1b[36m" },
+		{ "cached_start", "\x1b[37m" },
 		{ "cached_mid", "" },
-		{ "cached_end", "\x1b[96m" },
-		{ "available_start", "\x1b[33m" },
+		{ "cached_end", "\x1b[37m" },
+		{ "available_start", "\x1b[92m" },
 		{ "available_mid", "" },
-		{ "available_end", "\x1b[93m" },
-		{ "used_start", "\x1b[31m" },
+		{ "available_end", "\x1b[92m" },
+		{ "used_start", "\x1b[94m" },
 		{ "used_mid", "" },
-		{ "used_end", "\x1b[91m" },
-		{ "download_start", "\x1b[34m" },
+		{ "used_end", "\x1b[94m" },
+		{ "download_start", "\x1b[96m" },
 		{ "download_mid", "" },
-		{ "download_end", "\x1b[94m" },
-		{ "upload_start", "\x1b[35m" },
+		{ "download_end", "\x1b[96m" },
+		{ "upload_start", "\x1b[94m" },
 		{ "upload_mid", "" },
-		{ "upload_end", "\x1b[95m" },
-		{ "process_start", "\x1b[32m" },
-		{ "process_mid", "\x1b[33m" },
-		{ "process_end", "\x1b[31m" }
+		{ "upload_end", "\x1b[94m" },
+		{ "process_start", "\x1b[37m" },
+		{ "process_mid", "" },
+		{ "process_end", "\x1b[37m" }
 	};
 
 	namespace {
@@ -284,6 +298,18 @@ namespace Theme {
 			if (not colors.contains("graph_text")) {
 				colors["graph_text"] = colors.at("inactive_fg");
 				rgbs["graph_text"] = rgbs.at("inactive_fg");
+			}
+			// Older themes inherit Nova roles from their own palette. Resolving
+			// them on every reload also updates live charts when themes change.
+			for (const auto& [role, base] : array<std::pair<string, string>, 7>{{
+				{"gpu_load", "cpu_start"}, {"gpu_vram", "used_start"},
+				{"gpu_clock", "cached_start"}, {"gpu_mem_clock", "free_start"},
+				{"status_ok", "free_start"}, {"status_warning", "temp_mid"}, {"status_critical", "temp_end"}
+			}}) {
+				if (source.contains(role) and not source.at(role).empty()) continue;
+				const string key = colors.at(base).empty() ? "title" : base;
+				colors[role] = colors.at(key);
+				rgbs[role] = rgbs.at(key);
 			}
 		}
 

@@ -26,13 +26,23 @@ class Terminal:
         self.screen = pyte.Screen(width, height)
         self.stream = pyte.Stream(self.screen)
         self.decoder = codecs.getincrementaldecoder('utf-8')()
+        self.frame_tail = ''
+        self.in_frame = False
         self.drain(1.5)
 
     def drain(self, seconds):
         end = time.monotonic() + seconds
-        while time.monotonic() < end:
+        # Snapshot a complete synchronized redraw, including large charts
+        # whose output crosses a PTY read boundary at the nominal deadline.
+        while time.monotonic() < end or self.in_frame:
+            assert time.monotonic() < end + 3, 'Incomplete terminal redraw'
             if select.select([self.master], [], [], .05)[0]:
-                try: self.stream.feed(self.decoder.decode(os.read(self.master, 65536)))
+                try:
+                    data = self.decoder.decode(os.read(self.master, 65536))
+                    markers = re.findall(r'\x1b\[\?2026([hl])', self.frame_tail + data)
+                    if markers: self.in_frame = markers[-1] == 'h'
+                    self.frame_tail = (self.frame_tail + data)[-7:]
+                    self.stream.feed(data)
                 except OSError: break
         assert self.proc.poll() is None, self.text()
 

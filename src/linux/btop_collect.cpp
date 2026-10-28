@@ -28,6 +28,7 @@ tab-size = 4
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <netdb.h>
+#include "../btop_cpu_frequency.hpp"
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <arpa/inet.h> // for inet_ntop()
@@ -944,6 +945,24 @@ namespace Cpu {
 			if (cread.bad()) throw std::runtime_error("Failed to read /proc/stat");
 			else throw std::runtime_error("Cpu::collect() : " + string{e.what()});
 		}
+
+		if (Config::getB("show_core_freq"))
+			cpu.core_mhz = CpuFrequency::collect(cpu.core_percent.size(), "/sys/devices/system/cpu", Shared::procPath / "cpuinfo");
+		else cpu.core_mhz.clear();
+
+		static CpuPower::Collector package_power;
+		if (Config::getB("show_cpu_power")) {
+			const auto now = time_ms();
+			const auto power = package_power.collect(now);
+			cpu.package_power_mw = power.milliwatts;
+			cpu.power_status = power.status;
+			cpu.power_history.push_back({cpu.cpu_percent.at("total").back(), power.milliwatts, now});
+			while (cpu.power_history.size() > 4096) cpu.power_history.pop_front();
+		} else {
+			package_power.reset(); cpu.power_history.clear();
+			cpu.package_power_mw = -1; cpu.power_status = "unavailable";
+		}
+
 
 		if (Config::getB("check_temp") and got_sensors)
 			update_sensors();

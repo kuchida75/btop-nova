@@ -19,6 +19,7 @@ tab-size = 4
 #pragma once
 
 #include "btop_gpu_history.hpp"
+#include "btop_cpu_power.hpp"
 #include "btop_zram.hpp"
 #include <array>
 #include <atomic>
@@ -205,6 +206,10 @@ namespace Cpu {
 			{"guest_nice", {}}
 		};
 		vector<deque<long long>> core_percent;
+		vector<int> core_mhz; // Per logical CPU, -1 when unavailable (Linux).
+		long long package_power_mw = -1;
+		string power_status = "unavailable";
+		deque<CpuPower::Sample> power_history;
 		vector<deque<long long>> temp;
 		long long temp_max = 0;
 		array<double, 3> load_avg;

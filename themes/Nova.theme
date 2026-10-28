@@ -1,0 +1,66 @@
+# Nova dark slate palette. Copyright 2026 Nova btop contributors.
+# Licensed under Apache-2.0. [AI generated]
+# Stable metric colours; amber and red identify capacity/temperature warnings.
+
+theme[main_bg]="#111827"
+theme[main_fg]="#dbe4ef"
+theme[title]="#f0f6fc"
+theme[hi_fg]="#5bc4d6"
+theme[selected_bg]="#264859"
+theme[selected_fg]="#f0f6fc"
+theme[inactive_fg]="#7e8fa6"
+theme[graph_text]="#93a4bb"
+theme[meter_bg]="#2a394b"
+theme[proc_misc]="#5bc4d6"
+
+# One border colour throughout, with quieter internal dividers.
+theme[cpu_box]="#526579"
+theme[mem_box]="#526579"
+theme[net_box]="#526579"
+theme[proc_box]="#526579"
+theme[div_line]="#38495c"
+
+theme[temp_start]="#72c9a0"
+theme[temp_mid]="#e5ba73"
+theme[temp_end]="#ed7f84"
+
+# Cyan: CPU/GPU activity, disk reads and incoming network traffic.
+theme[cpu_start]="#5bc4d6"
+theme[cpu_mid]=""
+theme[cpu_end]=""
+theme[download_start]="#5bc4d6"
+theme[download_mid]=""
+theme[download_end]=""
+
+# Blue: used memory/storage, disk writes and outgoing network traffic.
+theme[used_start]="#81a8f8"
+theme[used_mid]=""
+theme[used_end]=""
+theme[upload_start]="#81a8f8"
+theme[upload_mid]=""
+theme[upload_end]=""
+
+# Green: available/free capacity; blue-grey: cache and secondary meters.
+theme[free_start]="#72c9a0"
+theme[free_mid]=""
+theme[free_end]=""
+theme[available_start]="#72c9a0"
+theme[available_mid]=""
+theme[available_end]=""
+theme[cached_start]="#a6b9d8"
+theme[cached_mid]=""
+theme[cached_end]=""
+
+# Calm, readable process rows; CPU sparklines retain the activity colour.
+theme[process_start]="#dbe4ef"
+theme[process_mid]=""
+theme[process_end]=""
+
+# Nova extensions also follow the selected theme.
+theme[gpu_load]="#5bc4d6"
+theme[gpu_vram]="#81a8f8"
+theme[gpu_clock]="#c3a6e8"
+theme[gpu_mem_clock]="#72c9a0"
+theme[status_ok]="#72c9a0"
+theme[status_warning]="#e5ba73"
+theme[status_critical]="#ed7f84"

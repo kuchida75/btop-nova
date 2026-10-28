@@ -9,6 +9,18 @@ int main() {
 		assert(compact >= std::min(8, height) and compact <= height);
 	}
 	assert(NovaLayout::cpu_height(21) == 14);
+	assert(NovaLayout::focus_cpu_height(100, 28, 17, 29) == 17);
+	assert(NovaLayout::focus_cpu_height(60, 12, 17, 29) == 17);
+	assert(NovaLayout::focus_cpu_height(50, 14, 17, 29) == 0);
+	for (int total = 24; total <= 300; ++total)
+		for (int gpu : {0, 11, 20, 28, 50})
+			for (int body : {22, 29, 40, 80}) {
+				for (int minimum : {8, 17, 30, 70}) {
+					const int cpu = NovaLayout::focus_cpu_height(total, gpu, minimum, body);
+					assert(cpu == (total - gpu - body >= minimum ? minimum : 0));
+					assert(cpu == 0 or cpu + gpu + body <= total);
+				}
+			}
 	assert(NovaLayout::memory_height(34, 49, 14, 6, false) == 23);
 	assert(NovaLayout::memory_height(34, 49, 14, 6, true) == 34);
 	for (int available = 16; available <= 150; ++available)

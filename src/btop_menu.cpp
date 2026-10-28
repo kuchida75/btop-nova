@@ -163,52 +163,77 @@ namespace Menu {
 	const array<int, 3> menu_width = {19, 12, 12};
 
 	const vector<array<string, 2>> help_text = {
-		{"Mouse 1", "Clicks buttons and selects in process list."},
-		{"Mouse scroll", "Scrolls any scrollable list/text under cursor."},
-		{"Esc, m", "Toggles main menu."},
-		{"p", "Cycle view presets forwards."},
-		{"shift + p", "Cycle view presets backwards."},
-		{"1", "Toggle CPU box."},
-		{"2", "Toggle MEM box."},
-		{"3", "Toggle NET box."},
-		{"4", "Toggle PROC box."},
-		{"5", "Toggle GPU box (gpu0 stays visible when pinned)."},
-		{"shift + b", "Show/hide boot and EFI partitions in disk view."},
-		{"shift + z", "Show/hide zram compression beneath RAM graphs."},
-		{"shift + v", "Switch to GPU load / VRAM histories."},
-		{"shift + n", "Toggle coloured GPU/VRAM/clock histories."},
-		{"shift + u", "Show/hide GPU processes below the chart."},
-		{"shift + m", "Show/hide the mounted-filesystem table."},
-		{"d", "Toggle disks view in MEM box."},
-		{"F2, o", "Shows options."},
-		{"F1, ?, h", "Shows this window."},
-		{"ctrl + z", "Sleep program and put in background."},
-		{"q, ctrl + c", "Quits program."},
-		{"+, -", "Add/Subtract 100ms to/from update timer."},
-		{"Up, Down", "Select in process list."},
-		{"Enter", "Show detailed information for selected process."},
-		{"Spacebar", "Expand/collapse the selected process in tree view."},
-		{"Pg Up, Pg Down", "Jump 1 page in process list."},
-		{"Home, End", "Jump to first or last page in process list."},
-		{"Left, Right", "Select previous/next sorting column."},
-		{"b, n", "Select previous/next network device."},
-		{"i", "Toggle disks io mode with big graphs."},
-		{"z", "Toggle totals reset for current network device"},
-		{"a", "Toggle auto scaling for the network graphs."},
-		{"y", "Toggle synced scaling mode for network graphs."},
-		{"f, /", "To enter a process filter."},
-		{"delete", "Clear any entered filter."},
-		{"c", "Toggle per-core cpu usage of processes."},
-		{"r", "Reverse sorting order in processes box."},
-		{"e", "Toggle processes tree view."},
-		{"%", "Toggles memory display mode in processes box."},
-		{"Selected +, -", "Expand/collapse the selected process in tree view."},
-		{"Selected t", "Terminate selected process with SIGTERM - 15."},
-		{"Selected k", "Kill selected process with SIGKILL - 9."},
-		{"Selected s", "Select or enter signal to send to process."},
-		{"", " "},
-		{"", "For bug reporting and project updates, visit:"},
-		{"", "https://github.com/aristocratos/btop"},
+		{"", "GLOBAL AND PANELS"},
+		{"F1, ?, h", "Keyboard shortcuts (H with Vim mode enabled)."},
+		{"F2, o", "Open options."},
+		{"Esc, m", "Open the main menu."},
+		{"p / Shift+P", "Next / previous view preset."},
+		{"1, 2, 3, 4", "Toggle CPU, memory, network and process panels."},
+		{"5-9, 0", "Toggle GPUs 0-5; GPU0 stays visible when pinned."},
+		{"Shift+F", "Per-thread MHz / normal CPU view."},
+		{"Shift+N", "Toggle coloured GPU/VRAM/clock histories."},
+		{"Shift+V", "Switch to GPU load / VRAM histories."},
+		{"Shift+U", "Show/hide GPU processes below the chart."},
+		{"Shift+M", "Show/hide the mounted-filesystem table."},
+		{"+, -", "Adjust refresh interval by 100 ms (CPU panel shown)."},
+		{"q / Ctrl+C", "Quit btop."},
+		{"Ctrl+Z", "Suspend btop; use fg in the shell to resume."},
+		{"", "DISKS, MEMORY AND NETWORK"},
+		{"d", "Show/hide disk cards in the memory panel."},
+		{"i", "Toggle normal disks / I/O graphs."},
+		{"Shift+B", "Show/hide boot and EFI disk cards."},
+		{"Shift+Z", "Show/hide zram compression beneath RAM graphs."},
+		{"b, n", "Previous / next network device."},
+		{"z", "Reset / restore totals for this network device."},
+		{"a", "Toggle automatic network graph scaling."},
+		{"y", "Toggle synced download/upload scaling."},
+		{"", "PROCESS LIST (WHEN THE PANEL IS SHOWN)"},
+		{"Up, Down", "Move the process selection."},
+		{"PgUp, PgDn", "Move one page in the process list."},
+		{"Home, End", "First / last process page."},
+		{"Left, Right", "Previous / next process sorting column."},
+		{"Enter", "Open / close selected process details."},
+		{"Space, +, -", "Expand/collapse selected tree process."},
+		{"f, /", "Start entering a process filter."},
+		{"Delete", "Clear the process filter when not editing."},
+		{"c", "Toggle process CPU usage per core / total CPU."},
+		{"r", "Reverse process sorting order."},
+		{"e", "Toggle process tree view."},
+		{"%", "Toggle process memory bytes / percent."},
+		{"Selected t", "Confirm SIGTERM (15) for the selected process."},
+		{"Selected k", "Confirm SIGKILL (9); use K in Vim mode."},
+		{"Selected s", "Choose a signal for the selected process."},
+		{"", "FILTERS AND TEXT EDITING"},
+		{"Enter / Down", "Apply filter; Down also moves into the list."},
+		{"Esc", "Cancel filter/text editing and restore prior value."},
+		{"Left, Right", "Move the text cursor."},
+		{"Home, End", "Move to the start / end of the text."},
+		{"Backspace, Delete", "Erase before / at the text cursor."},
+		{"", "MENUS AND OPTIONS"},
+		{"Up, Down / Tab", "Move through the main menu; Enter selects."},
+		{"Shift+Tab", "Move backwards through menus/categories."},
+		{"Tab / 1-6", "Next options category / choose category number."},
+		{"Up, Down", "Previous / next option (wraps between pages)."},
+		{"PgUp, PgDn", "Previous / next options page."},
+		{"Left, Right", "Toggle / change the selected option."},
+		{"Enter, e, E", "Edit an editable option; Enter saves the value."},
+		{"Esc, q, o, Backspace", "Close options when not editing."},
+		{"Y, N", "Answer Yes / No in a confirmation dialog."},
+		{"Tab / Left, Right", "Change a confirmation dialog selection."},
+		{"Enter, Space", "Confirm the highlighted dialog choice."},
+		{"Digits / Backspace", "Enter / erase a signal number in signal chooser."},
+		{"Arrows / h,j,k,l", "Move around the signal chooser; Enter sends."},
+		{"Esc, q", "Cancel the signal chooser or dialog."},
+		{"", "VIM MODE (ENABLE IN GENERAL OPTIONS)"},
+		{"h, j, k, l", "Left, down, up, right in lists/options."},
+		{"g, Shift+G", "First / last process page."},
+		{"Shift+H, Shift+K", "Open shortcuts / kill selected process."},
+		{"", "SHORTCUT REFERENCE NAVIGATION"},
+		{"PgDn / Down / Tab", "Next shortcuts page; Right also works."},
+		{"PgUp/Up/Shift+Tab", "Previous shortcuts page; Left also works."},
+		{"Home, End", "First / last shortcuts page."},
+		{"F1, ?, h, H, Esc", "Close this reference (q/Enter/Space also work)."},
+		{"Mouse click / wheel", "Click buttons/rows; wheel scrolls under pointer."},
 	};
 
 	const vector<vector<vector<string>>> categories = {
@@ -504,6 +529,22 @@ namespace Menu {
 				"",
 				"Can cause slowdowns on systems with many",
 				"cores and certain kernel versions."},
+			{"show_cpu_power",
+				"CPU package watts and CPU/power dot history.",
+				"",
+				"One upward chart; load uses 0-100%.",
+				"Power uses a labelled auto-scaled watt range.",
+				"Reads Linux RAPL package energy counters.",
+				"Needs read access; -- means unavailable.",
+				"Package power is not wall-socket power."},
+			{"show_core_freq",
+				"Show per-thread frequency in MHz (Linux).",
+				"",
+				"Shift+F toggles up to three columns.",
+				"Small windows use the normal CPU view.",
+				"Unavailable readings appear as --.",
+				"Uses kernel-reported frequency samples.",
+				"Shared CPU policies may report equal MHz."},
 			{"custom_cpu_name",
 				"Custom cpu model name in cpu percentage box.",
 				"",
@@ -1198,6 +1239,8 @@ namespace Menu {
 					out += Mv::to(cy++, Term::width/2 - menu_width[i]/2) + (tty_mode ? "" : colors[ic++]) + line;
 				}
 			}
+			out += Mv::to(y + 11, Term::width / 2 + 9) + Theme::c("main_fg") + Fx::ub + "Keyboard shortcuts";
+			mouse_mappings["button_1"] = {y + 10, Term::width / 2 - 6, 3, 34};
 			out += Fx::reset;
 		}
 
@@ -1567,23 +1610,26 @@ namespace Menu {
 		int retval = Changed;
 
 		if (redraw) {
-			y = max(1, Term::height/2 - 4 - (int)(help_text.size() / 2));
+			height = min(Term::height - 8, (int)help_text.size() + 3);
+			y = max(1, (Term::height - height - 7) / 2);
 			x = Term::width/2 - 39;
-			height = min(Term::height - 6, (int)help_text.size() + 3);
 			pages = ceil((double)help_text.size() / (height - 3));
-			page = 0;
+			page = min(page, pages - 1);
+			mouse_mappings.clear();
 			bg = Draw::banner_gen(y, 0, true);
-			bg += Draw::createBox(x, y + 6, 78, height, Theme::c("hi_fg"), true, "help");
+			bg += Draw::createBox(x, y + 6, 78, height, Theme::c("hi_fg"), true, "keyboard shortcuts");
 		}
-		else if (is_in(key, "escape", "q", "h", "backspace", "space", "enter", "mouse_click")) {
+		else if (is_in(key, "escape", "q", "h", "H", "f1", "F1", "?", "backspace", "space", "enter", "mouse_click")) {
 			return Closed;
 		}
-		else if (pages > 1 and is_in(key, "down", "page_down", "tab", "mouse_scroll_down")) {
+		else if (pages > 1 and is_in(key, "down", "right", "page_down", "tab", "mouse_scroll_down", "help_next")) {
 			if (++page >= pages) page = 0;
 		}
-		else if (pages > 1 and is_in(key, "up", "page_up", "shift_tab", "mouse_scroll_up")) {
+		else if (pages > 1 and is_in(key, "up", "left", "page_up", "shift_tab", "mouse_scroll_up", "help_prev")) {
 			if (--page < 0) page = pages - 1;
 		}
+		else if (key == "home") page = 0;
+		else if (key == "end") page = pages - 1;
 		else {
 			retval = NoChange;
 		}
@@ -1592,15 +1638,22 @@ namespace Menu {
 		if (retval == Changed) {
 			auto& out = Global::overlay;
 			out = bg;
+			const int footer = y + height + 6;
+			out += Mv::to(footer, x + 2) + Theme::c("hi_fg") + "< Prev"
+				+ Mv::to(footer, x + 10) + Theme::c("title") + "page " + to_string(page + 1) + '/' + to_string(pages)
+				+ Mv::to(footer, x + 24) + Theme::c("hi_fg") + "Next >"
+				+ Mv::to(footer, x + 34) + Theme::c("main_fg") + "PgUp/PgDn | Esc close";
 			if (pages > 1) {
-				out += Mv::to(y+height+6, x + 2) + Theme::c("hi_fg") + Symbols::title_left_down + Fx::b + Symbols::up + Theme::c("title") + " page "
-					+ to_string(page+1) + '/' + to_string(pages) + ' ' + Theme::c("hi_fg") + Symbols::down + Fx::ub + Symbols::title_right_down;
+				mouse_mappings["help_prev"] = {footer, x + 2, 1, 6};
+				mouse_mappings["help_next"] = {footer, x + 24, 1, 6};
 			}
 			auto cy = y+7;
 			out += Mv::to(cy++, x + 1) + Theme::c("title") + Fx::b + cjust("Key:", 20) + "Description:";
 			for (int c = 0, i = max(0, (height - 3) * page); c++ < height - 3 and i < (int)help_text.size(); i++) {
-				out += Mv::to(cy++, x + 1) + Theme::c("hi_fg") + Fx::b + cjust(help_text[i][0], 20)
-					+ Theme::c("main_fg") + Fx::ub + help_text[i][1];
+				out += Mv::to(cy++, x + 1);
+				if (help_text[i][0].empty()) out += Theme::c("title") + Fx::b + uresize(help_text[i][1], 76);
+				else out += Theme::c("hi_fg") + Fx::b + cjust(help_text[i][0], 20)
+					+ Theme::c("main_fg") + Fx::ub + uresize(help_text[i][1], 56);
 			}
 			out += Fx::reset;
 		}

@@ -17,6 +17,11 @@ struct Entry {
 	bool valid{};
 };
 
+// Capacity alerts are relative to filesystem size, including small EFI mounts.
+inline const char* capacity_status(double used_percent) {
+	return used_percent < 80 ? "status_ok" : used_percent < 90 ? "status_warning" : "status_critical";
+}
+
 inline std::string decode_field(const std::string& field) {
 	std::string out;
 	for (size_t i = 0; i < field.size(); ++i) {

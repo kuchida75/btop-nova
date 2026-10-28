@@ -7,6 +7,125 @@ Run sh ./launch-nova-btop from this checkout, or pass its absolute path to sh.
 The launcher uses nova-config/btop, separate from ~/.config/btop, and opens
 normal disk mode each time. Press i to toggle the optional I/O-only view.
 
+Keyboard shortcuts (io14):
+Click keys beside the CPU menu/preset buttons, choose menu > Help (Keyboard
+shortcuts), or press F1, ? or h (Shift+H in Vim mode). The keys button appears
+at 100 columns or wider. The reference includes global/panel controls, Nova
+GPU/disk options, processes, text editing, menus/options and Vim bindings.
+It paginates at small sizes down to 80x24. PgUp/PgDn, arrows and clickable
+Prev/Next browse pages; Home/End jump to the first/last page. Esc closes it.
+Both common F1/F2 terminal encodings work; function-key dispatch now matches
+the lowercase decoded names. No process actions occur while reading help.
+test_shortcuts.py checks every reference entry at 80x24, 100x35, 146x60 and
+200x100, all entry points, clickable paging, menu return and Vim mode.
+
+CPU package power and upward history (io18, Linux):
+Options > CPU > show_cpu_power enables CPU package watts plus an upward-only
+CPU/power dot history. CPU load uses 0-100%; package power uses a separately
+labelled watt range, rounded up to the next 50 W for the visible history.
+Colours distinguish usage and watts. Narrow graphs retain the ordinary single
+CPU history and show watts in the MHz table footer when space permits.
+No extra CPU rows are allocated. Disabling power restores cpu_single_graph,
+cpu_graph_upper/lower and the configured lower-graph orientation.
+
+Watts are the sum of RAPL package energy changes over measured steady-clock
+elapsed time, not instantaneous peak power or wall-socket power. Package
+subdomains, DRAM and psys are excluded; aliases are deduplicated. The collector
+handles counter rollover, rejects resets and implausible jumps, and rebaselines
+after missing data, package changes, pauses or read failures. Missing/denied
+readings show --W and leave gaps; a measured zero is displayed as 0.0W.
+
+Kernel ABI: https://docs.kernel.org/power/powercap/powercap.html
+Only name, energy_uj and max_energy_range_uj are read. Nothing writes energy,
+limits, governors, online state or driver controls. Many Linux installations
+make energy counters readable only by root. Run btop as your ordinary user;
+an administrator can grant narrowly scoped read access if desired. Such a
+sysfs permission change normally expires at reboot. Normal btop installation
+adds no permission rule or service; the optional prepare_cpu_power_access.py
+helper prepares a rule for explicit administrator installation. Power defaults
+to off and existing preferences are retained on upgrade.
+
+Set cpu_single_graph=True for a regular upward CPU usage history without
+power. cpu_invert_lower=False also disables the inverted lower view if that
+lower graph is explicitly enabled again. A regular upward CPU graph works independently of the optional watts view;
+live watts remain off by default until explicitly enabled.
+
+Validation: tests/nova_cpu_power.cpp checks conversion, multi-package totals,
+subdomain/alias exclusion, wrap/reset/zero handling, missing/denied counters and
+power scale. test_cpu_power.py feeds known energy changes through a test-only
+sysfs redirect and checks numeric watts, distinct upward traces, changing
+scales, gaps/recovery, styles, narrow windows, options and saved preferences.
+These fixtures are never installed and do not modify real powercap files.
+
+Real-hardware CPU power and wireless validation (2026-10-28):
+The io18 binary was checked on Ubuntu 26.04.1 with an Intel Core i9-13900KS /
+GeForce RTX 4080 SUPER and an AMD Ryzen 9 9950X / GeForce RTX 5090. Both have
+32 logical CPUs. Readable RAPL counters supplied real package watts; both
+CPU-usage and package-power curves were present in distinct theme colours.
+All 32 MHz readings, GPU processes, disk I/O, mounts and network display stayed
+visible. Explicit wireless-interface startup selection was verified on both.
+Existing profiles were preserved apart from the requested show_cpu_power and
+net_iface values, and the prior executable/profile were backed up. This checks
+live counter access and display behavior, not calibration against an external
+power meter. One-time counter permissions expire at reboot; the optional udev
+setup below restores the same scoped read access on future device events.
+
+To save a wireless startup default, set Options > NET > net_iface to the local
+connected Wi-Fi interface name. Generic release profiles keep automatic
+selection. When editing the config externally, exit other running btop
+instances first so cached preferences cannot overwrite the new values.
+
+Persistent CPU energy access (optional):
+prepare_cpu_power_access.py generates an administrator installer and a udev
+rule for the normal user's primary group. It matches only RAPL package devices
+on add/change events and runs chgrp plus chmod g+r on energy_uj. Core/uncore
+subdomains, psys and power-control attributes are excluded. The installer
+checks the generated checksum and rule syntax, preserves unmanaged rules,
+backs up an older managed rule, and tests restoration from boot permissions.
+No custom daemon or root btop process is installed. Rule removal is documented
+in INSTALL_NOVA_PC.md. test_cpu_power_access.py checks group input, output
+preservation and real udev add/change matching with subdomain exclusion.
+The persistent rule was installed and verified on the two Ubuntu 26.04.1
+systems listed above. Both administrator installers restored group read access
+from root-only boot permissions through a udev change event and printed PASS.
+Installed rules were root-owned and matched a replayed add event; ordinary-user
+energy readings and saved btop power/Wi-Fi preferences were checked afterward.
+
+CPU height balance and three-column MHz (io17, Linux):
+Shift+F or Options > CPU > show_core_freq enables per-thread MHz. The generic
+setting remains off. On a 32-thread CPU, three columns use 11 rows for usage,
+MHz and available temperatures. The values occupy 73 columns; all remaining
+width belongs to the CPU history. Minimum width is 87 columns with temperatures,
+and the CPU panel needs 17 rows. Short windows use the ordinary CPU view and
+restore MHz when enlarged. The existing CPU-header clock remains independent.
+
+When nova_layout is enabled and CPU, memory, network and processes are all
+shown, the CPU height fits its per-core table instead of absorbing unused
+lower-panel rows. On a 32-thread system it stays at 17 rows even in tall
+windows. Memory keeps the rows needed for RAM and disk metrics; the remaining
+body space extends both network histories and the process viewport. Network
+rates, totals, peak rates (when tall enough) and controls remain available.
+Process priorities, sorting, scrolling, paging, filtering and details do not
+change. GPU height and the full-width mounts table are retained.
+Memory, disk, known zram devices and restored swap requirements take precedence;
+extra mount rows are capped at ten and shown/total remains visible. Opening
+process details reserves more process space. Unsupported/short layouts use
+the ordinary allocation; disabling MHz or nova_layout restores that allocation.
+
+The collector reads each logical CPU's cpufreq/scaling_cur_freq in kHz, with
+per-processor /proc/cpuinfo fallback. Offline, missing or invalid readings show
+--; no aggregate clock is copied to every thread and no stale data is retained.
+These are kernel-reported snapshots. Shared CPU policies can report equal MHz.
+Kernel interface: https://docs.kernel.org/admin-guide/pm/cpufreq.html
+No governors, frequency limits, CPU online state, mounts or drivers change.
+
+Validation: frequency/layout C++ unit tests cover data mapping and allocation
+bounds. test_cpu_frequency.py covers deterministic values, three columns,
+styles/units, options, presets, filter focus, missing/offline readings and
+resize restoration. test_cpu_space.py checks bounded CPU height, returned
+network/process space, selection, details, paging/tree/filtering, sorting and controls,
+RAM metrics, mount/boot controls, alternate placements and small windows.
+
 Nova layout (io7):
 The Nova profile gives GPU histories more height by shortening the aggregate
 CPU panel. It keeps the combined CPU/GPU height unchanged so lower panels do
@@ -79,13 +198,34 @@ readings remain, with the normal upper/lower graph settings. The installer
 and launchers remove the retired cpu_logical_graphs key from older profiles.
 The binary ignores this old key if started directly. Other preferences persist.
 
+Consistent Nova theme (io13):
+The Nova palette uses dark slate, light text, matching panel borders and
+quieter dividers. Cyan identifies activity, disk reads and incoming network
+traffic. Blue identifies used memory/storage, disk writes and outgoing traffic.
+GPU graphics clocks use lavender; GPU memory clocks use green. Tables keep
+neutral headings and identity text, with colour on metrics and capacity alerts.
+Temperature gradients use green, amber and red. Zram savings use green/red.
+The process list uses readable text without fading in a fresh Nova profile.
+
+Options > GENERAL > color_theme selects Nova or another theme. GPU chart,
+mount table and zram colours now come from the selected theme, including live
+theme changes. Existing themes without the new roles inherit their own metric
+colours. 16-colour TTY and 256-colour terminals keep the same colour roles.
+Source builds also discover themes in the checkout's themes directory.
+
+To apply Nova to an existing user installation: python3 install_nova.py --apply-theme.
+This saves a profile backup, changes color_theme to Nova and disables process
+row fading. It preserves other preferences; ordinary later upgrades preserve
+the selected theme. Fresh profiles already use Nova.
+
 Mounted filesystem table (Linux):
 The bottom of the body contains a live duf-style table of local
 mounted filesystems. It shows MOUNTED ON, SIZE, USED, AVAIL, a usage bar and
 percentage, plus TYPE and FILESYSTEM/device when the panel is wide enough.
-Paths/devices are blue, headers and metrics use distinct colours, usage bars
-are green below 50%, yellow below 90%, and red at 90% or higher. Available
-space is green at 10 GB or more, yellow below 10 GB, and red below 1 GB.
+Headers and paths use readable neutral text; device/type metadata is muted.
+Used bytes are blue. Usage bars and available space are green below 80% used,
+amber from 80%, and red from 90%. Percentage thresholds apply to every
+filesystem, so small, mostly empty boot/EFI mounts do not give false alarms.
 TTY and 256-colour terminals receive matching colour fallbacks.
 It reads mountinfo and filesystem statistics directly; no duf subprocess or
 additional runtime dependency is required. Local block filesystems, Btrfs
@@ -124,10 +264,16 @@ Resize the terminal if every disk card cannot fit. No files are written to
 boot/EFI as part of testing, and no partitions are mounted by this build.
 
 GPU view:
+From io12, the right statistics panel uses about one third of the GPU panel
+width, with a readable minimum of 41 columns and a compact maximum of 52.
+The remaining width goes to the history chart. All existing temperature,
+power, clock, VRAM and PCIe readings remain visible; narrow-chart fallback
+and automatic restoration continue to work.
+
 Options > GPU > gpu_always_visible keeps gpu0 visible at launch and across
 presets. Nova enables it initially. Disable it to let the 5 key hide gpu0.
-Nova initially enables a live coloured chart: cyan GPU load, yellow VRAM
-occupancy, magenta graphics clock and green memory clock. It uses a fixed
+Nova initially enables a live coloured chart: cyan GPU load, blue VRAM
+occupancy, lavender graphics clock and green memory clock. It uses a fixed
 0-100% axis with newest samples at the right and an elapsed-history label.
 From io9 the chart uses fine Braille dot curves, with two samples horizontally
 and four vertical dot levels per character, instead of whole-character step
@@ -170,7 +316,7 @@ A GPU-only panel requires 60 columns. New chart/process settings are enabled
 once by the Nova installer; later choices persist across launches/upgrades.
 
 Normal disk mode displays name and mounted filesystem capacity, used percent
-and bytes, then separate read (green) and write (red) history graphs with
+and bytes, then separate read (cyan) and write (blue) history graphs with
 current values in binary MiB/s. Larger panels use two rows per graph; smaller
 panels use one-row sparklines. Resize the terminal if lower disks do not fit.
 R and W share an automatic scale based on the visible history, with 25 percent
@@ -275,7 +421,9 @@ The GPU preview is explicitly labelled synthetic; host mount values are real.
 Results: test-gpu-color-results.txt. Physical GPU comparison with nvtop
 remains a normal-terminal check because the sandbox cannot access GPU devices.
 test_gpu_dots.py renders a dense four-colour simulated history, checks both
-dot columns, inherited TTY symbols and small-window restoration, and exports
+dot columns, inherited TTY symbols, compact statistics at 80-200 columns,
+and small-window restoration. Captures finish synchronized redraws before
+checking the graph, including frames spanning multiple terminal reads. It exports
 nova-gpu-dots-preview.png. Results: test-gpu-dots-results.txt.
 
 Layout validation: tests/nova_layout.cpp checks compact CPU,
@@ -304,3 +452,11 @@ swap display and native braille/block/TTY styles in a real terminal. Results
 are in test-zram-results.txt. No memory pressure or swap activity is generated.
 Both Nova collectors are listed in the CMake target; this host has no cmake
 executable, so the CMake build was not run. The Make build passed.
+
+Theme validation: test_theme.py checks text contrast, shared metric colours,
+uniform panel borders, disk and PCIe read/write colours, and live theme changes.
+It verifies older themes inherit the new metric roles from their own palette,
+16/256-colour terminals, transparency and resize fallback/restoration. Capacity
+warning boundaries are tested in tests/nova_mounts.cpp. test_install.py verifies
+ordinary upgrades preserve the selected theme, while --apply-theme changes only
+the theme and process gradient and saves the previous profile.

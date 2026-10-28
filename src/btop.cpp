@@ -79,7 +79,7 @@ namespace Global {
 		{"#801414", "██████╔╝   ██║   ╚██████╔╝██║        ╚═╝    ╚═╝"},
 		{"#000000", "╚═════╝    ╚═╝    ╚═════╝ ╚═╝"},
 	};
-	const string Version = "1.3.0-nova-io11";
+	const string Version = "1.3.0-nova-io18";
 
 	int coreCount;
 	string overlay;
@@ -886,6 +886,11 @@ int main(int argc, char **argv) {
 	if (std::error_code ec; not Global::self_path.empty()) {
 		Theme::theme_dir = fs::canonical(Global::self_path / "../share/btop/themes", ec);
 		if (ec or not fs::is_directory(Theme::theme_dir) or access(Theme::theme_dir.c_str(), R_OK) == -1) Theme::theme_dir.clear();
+		// Source builds keep their themes beside the bin directory.
+		if (Theme::theme_dir.empty()) {
+			Theme::theme_dir = fs::canonical(Global::self_path / "../themes", ec);
+			if (ec or not fs::is_directory(Theme::theme_dir) or access(Theme::theme_dir.c_str(), R_OK) == -1) Theme::theme_dir.clear();
+		}
 	}
 	//? If relative path failed, check two most common absolute paths
 	if (Theme::theme_dir.empty()) {

@@ -28,6 +28,7 @@ tab-size = 4
 #include "btop_config.hpp"
 #include "btop_mounts.hpp"
 #include "btop_nova_layout.hpp"
+#include "btop_cpu_frequency.hpp"
 #include "btop_theme.hpp"
 #include "btop_shared.hpp"
 #include "btop_tools.hpp"
@@ -53,17 +54,13 @@ using namespace std::literals; // for operator""s
 namespace rng = std::ranges;
 
 namespace NovaColor {
-	// Stable metric colours, with explicit 16-colour and 256-colour fallbacks.
-	string color(int index) {
-		static const array<string, 6> hex{"#00bcd4", "#ffcd4b", "#d772e5", "#52c878", "#6ba8ff", "#f06a6a"};
-		static const array<string, 6> ansi{"\x1b[96m", "\x1b[93m", "\x1b[95m", "\x1b[92m", "\x1b[94m", "\x1b[91m"};
-		if (Config::getB("tty_mode") or Config::getS("color_theme") == "TTY") return ansi.at(index);
-		static const auto truecolors = [&] { array<string, 6> result; for (int i = 0; i < 6; ++i) result[i] = Theme::hex_to_color(hex[i], false); return result; }();
-		static const auto colors256 = [&] { array<string, 6> result; for (int i = 0; i < 6; ++i) result[i] = Theme::hex_to_color(hex[i], true); return result; }();
-		return (Config::getB("truecolor") ? truecolors : colors256).at(index);
+	const string& color(int index) {
+		static const array<string, 4> roles{"gpu_load", "gpu_vram", "gpu_clock", "gpu_mem_clock"};
+		return Theme::c(roles.at(index));
 	}
-	int usage(double percent) { return percent < 50 ? 3 : percent < 90 ? 1 : 5; }
-	int available(uint64_t bytes) { return bytes < 1000000000 ? 5 : bytes < 10000000000 ? 1 : 3; }
+	const string& capacity(double used_percent) {
+		return Theme::c(Mounts::capacity_status(used_percent));
+	}
 }
 
 namespace Symbols {
@@ -528,6 +525,8 @@ namespace Cpu {
 	int x = 1, y = 1, width = 20, height;
 	int b_columns, b_column_size;
 	int b_x, b_y, b_width, b_height;
+	bool core_frequency_view = false;
+	CpuFrequency::Layout frequency_layout{};
 	long unsigned int lavg_str_len = 0;
 	int graph_up_height, graph_low_height;
 	int graph_up_width, graph_low_width;
@@ -543,11 +542,69 @@ namespace Cpu {
 	vector<Draw::Graph> gpu_temp_graphs;
 	vector<Draw::Graph> gpu_mem_graphs;
 
+	string power_text(long long mw) {
+		return mw < 0 ? "--W" : fmt::format("{:.1f}W", mw / 1000.0);
+	}
+
+	string power_chart(const cpu_info& cpu, int left, int top, int columns, int rows, bool tty) {
+		const int plot_width = columns - 4, plot_height = rows - 3;
+		const int visible = GpuHistory::visible_samples(cpu.power_history.size(), plot_width, not tty);
+		const auto scale = CpuPower::scale_mw(cpu.power_history, visible);
+		std::deque<GpuHistory::Sample> history;
+		const size_t first = cpu.power_history.size() - visible;
+		for (size_t i = first; i < cpu.power_history.size(); ++i) {
+			const auto& sample = cpu.power_history[i];
+			GpuHistory::Sample point;
+			point.values[0] = sample.load;
+			point.values[1] = sample.milliwatts < 0 ? -1 : (sample.milliwatts * 100 + scale / 2) / scale;
+			point.timestamp = sample.timestamp; history.push_back(point);
+		}
+		const int half = columns / 2;
+		const string load = "CPU " + to_string(safeVal(cpu.cpu_percent, "total"s).back()) + "%";
+		string out;
+		for (int row = 0; row < rows; ++row) out += Mv::to(top + row, left) + string(columns, ' ');
+		out += Mv::to(top, left) + NovaColor::color(0) + Fx::b + uresize(load, half) + Fx::ub
+			+ Mv::to(top, left + half) + NovaColor::color(1) + Fx::b + uresize("PKG " + power_text(cpu.package_power_mw), columns - half) + Fx::ub;
+		out += Mv::to(top + 1, left) + NovaColor::color(0) + uresize("CPU 0-100%", half)
+			+ Mv::to(top + 1, left + half) + NovaColor::color(1)
+			+ uresize(cpu.package_power_mw < 0 ? cpu.power_status : "Power 0-" + to_string(scale / 1000) + "W", columns - half);
+		const auto pixels = GpuHistory::raster(history, plot_width, plot_height, not tty);
+		for (int row = 0; row < plot_height; ++row) {
+			out += Mv::to(top + 2 + row, left) + Theme::c("main_fg")
+				+ rjust(row == 0 ? "100" : row == plot_height - 1 ? "0" : row == (plot_height - 1) / 2 ? "50" : "", 3)
+				+ Theme::c("div_line") + (tty ? "|" : "│");
+			for (int col = 0; col < plot_width; ++col) {
+				const auto& pixel = pixels[row * plot_width + col];
+				if (pixel.series) {
+					// Prefer power colour where curves meet; both dot masks remain visible.
+					out += NovaColor::color(pixel.series & 2 ? 1 : 0);
+					if (tty) out += '.';
+					else {
+						const unsigned code = 0x2800 + pixel.dots;
+						out += static_cast<char>(0xe0 | (code >> 12));
+						out += static_cast<char>(0x80 | ((code >> 6) & 0x3f));
+						out += static_cast<char>(0x80 | (code & 0x3f));
+					}
+				} else out += Theme::c("inactive_fg") + (row == plot_height - 1 ? (tty ? "." : "·") : " ");
+			}
+		}
+		if (Config::getB("show_uptime")) out += Mv::to(top + rows - 1, left) + Theme::c("graph_text")
+			+ uresize("up " + sec_to_dhms(system_uptime()), half);
+		const double duration = history.size() > 1 ? (history.back().timestamp - history.front().timestamp) / 1000.0 : 0;
+		out += Mv::to(top + rows - 1, left + half) + Theme::c("main_fg")
+			+ uresize(fmt::format("-{:.1f}s", duration), columns - half - 3)
+			+ Mv::to(top + rows - 1, left + columns - 2) + "0s";
+		return out;
+	}
+
     string draw(const cpu_info& cpu, const vector<Gpu::gpu_info>& gpus, bool force_redraw, bool data_same) {
 		if (Runner::stopping) return "";
 		if (force_redraw) redraw = true;
 		bool show_temps = (Config::getB("check_temp") and got_sensors);
-		auto single_graph = Config::getB("cpu_single_graph");
+		const bool show_power = Config::getB("show_cpu_power");
+		auto single_graph = Config::getB("cpu_single_graph") or show_power;
+		const int history_width = x + width - b_width - 3;
+		const bool power_history = show_power and history_width >= 28 and height >= 9;
 		bool hide_cores = show_temps and (cpu_temp_only or not Config::getB("show_coretemp"));
 		const int extra_width = (hide_cores ? max(6, 6 * b_column_size) : 0);
 	#ifdef GPU_SUPPORT
@@ -600,6 +657,10 @@ namespace Cpu {
 			out += Mv::to(button_y, x + 16) + title_left + Theme::c("hi_fg") + Fx::b + 'p' + Theme::c("title") + "reset "
 				+ (Config::current_preset < 0 ? "*" : to_string(Config::current_preset)) + Fx::ub + title_right;
 			Input::mouse_mappings["p"] = {button_y, x + 17, 1, 8};
+			if (width >= 100) {
+				out += Mv::to(button_y, x + 28) + title_left + Theme::c("hi_fg") + Fx::b + "keys" + Fx::ub + title_right;
+				Input::mouse_mappings["f1"] = {button_y, x + 29, 1, 4};
+			}
 			const string update = to_string(Config::getI("update_ms")) + "ms";
 			out += Mv::to(button_y, x + width - update.size() - 8) + title_left + Fx::b + Theme::c("hi_fg") + "- " + Theme::c("title") + update
 				+ Theme::c("hi_fg") + " +" + Fx::ub + title_right;
@@ -695,8 +756,15 @@ namespace Cpu {
 
 			if (mid_line) {
 				out += Mv::to(y + graph_up_height + 1, x) + Fx::ub + Theme::c("cpu_box") + Symbols::div_left + Theme::c("div_line")
-					+ Symbols::h_line * (width - b_width - 2) + Symbols::div_right
-					+ Mv::to(y + graph_up_height + 1, x + ((width - b_width) / 2) - ((graph_up_field.size() + graph_lo_field.size()) / 2) - 4)
+					+ Symbols::h_line * (width - b_width - 2) + Symbols::div_right;
+				if (core_frequency_view) {
+					const int field_space = max(0, graph_default_width - 6);
+					const string label = uresize(graph_up_field, field_space / 2) + " ▲▼ "
+						+ uresize(graph_lo_field, field_space - field_space / 2);
+					out += Mv::to(y + graph_up_height + 1, x + 1 + (graph_default_width - ulen(label)) / 2)
+						+ Theme::c("main_fg") + label;
+				}
+				else out += Mv::to(y + graph_up_height + 1, x + ((width - b_width) / 2) - ((graph_up_field.size() + graph_lo_field.size()) / 2) - 4)
 					+ Theme::c("main_fg") + graph_up_field + Mv::r(1) + "▲▼" + Mv::r(1) + graph_lo_field;
 			}
 
@@ -787,21 +855,24 @@ namespace Cpu {
 				out += graphs[0](safeVal(cpu.cpu_percent, graph_field), (data_same or redraw));
 		};
 
-		draw_graphs(graphs_upper, graph_up_height, graph_up_width, graph_up_field);
+		if (power_history) {
+			const bool ascii = tty_mode or graph_symbol == "tty" or (graph_symbol == "default" and Config::getS("graph_symbol") == "tty");
+			out += power_chart(cpu, x + 1, y + 1, history_width, height - 2, ascii);
+		} else draw_graphs(graphs_upper, graph_up_height, graph_up_width, graph_up_field);
 		if (not single_graph) {
 			out += Mv::to(y + graph_up_height + 1 + mid_line, x + 1);
 			draw_graphs(graphs_lower, graph_low_height, graph_low_width, graph_lo_field);
 		}
 
 		//? Uptime
-		if (Config::getB("show_uptime")) {
+		if (Config::getB("show_uptime") and not power_history) {
 			string upstr = sec_to_dhms(system_uptime());
 			if (upstr.size() > 8) {
 				upstr.resize(upstr.size() - 3);
-				upstr = trans(upstr);
 			}
+			if (core_frequency_view) upstr = uresize(upstr, max(0, b_x - x - 5));
 			out += Mv::to(y + (single_graph or not Config::getB("cpu_invert_lower") ? 1 : height - 2), x + 2)
-				+ Theme::c("graph_text") + "up" + Mv::r(1) + upstr;
+				+ Theme::c("graph_text") + "up" + Mv::r(1) + trans(upstr);
 		}
 
 		//? Cpu clock and cpu meter
@@ -826,8 +897,33 @@ namespace Cpu {
 		//? Core text and graphs
 		int cx = 0, cy = 1, cc = 0, core_width = (b_column_size == 0 ? 2 : 3);
 		if (Shared::coreCount >= 100) core_width++;
-		for (const auto& n : iota(0, Shared::coreCount)) {
-			if (cmp_less(core_graphs.size(), n+1)) break;
+		if (core_frequency_view) {
+			const auto& layout = frequency_layout;
+			for (int n = 0; n < Shared::coreCount; ++n) {
+				const int column = n / layout.rows, row = n % layout.rows;
+				const int left = b_x + 1 + column * layout.cell_width;
+				const auto& usage = safeVal(cpu.core_percent, n);
+				out += Mv::to(b_y + 2 + row, left) + Theme::c("main_fg") + 'C' + ljust(to_string(n), layout.id_width) + ' ';
+				const auto percent = usage.empty() ? 0ll : clamp(usage.back(), 0ll, 100ll);
+				out += Theme::g("cpu").at(percent) + rjust(usage.empty() ? "--" : to_string(percent), 3) + Theme::c("main_fg") + '%';
+				const int mhz = std::cmp_less(n, cpu.core_mhz.size()) ? cpu.core_mhz[n] : -1;
+				out += ' ' + rjust(mhz > 0 ? to_string(mhz) : "--", 5) + "MHz";
+				if (show_temps and not hide_cores) {
+					string temperature = "--";
+					if (std::cmp_less(n + 1, cpu.temp.size()) and not cpu.temp[n + 1].empty()) {
+						const auto [temp, unit] = celsius_to(cpu.temp[n + 1].back(), temp_scale);
+						temperature = rjust(to_string(temp), 3) + unit;
+					}
+					out += ' ' + Theme::c("main_fg") + ljust(temperature, 5, true);
+				}
+				out += string(layout.padding, ' ') + Theme::c("div_line") + Symbols::v_line;
+			}
+			cy = layout.rows + 1;
+			cc = layout.columns - 1;
+			cx = layout.cell_width * cc;
+		}
+		else for (const auto& n : iota(0, Shared::coreCount)) {
+			if ((b_column_size > 0 or extra_width > 0) and cmp_less(core_graphs.size(), n+1)) break;
 			out += Mv::to(b_y + cy + 1, b_x + cx + 1) + Theme::c("main_fg") + (Shared::coreCount < 100 ? Fx::b + 'C' + Fx::ub : "")
 				+ ljust(to_string(n), core_width);
 			if (b_column_size > 0 or extra_width > 0)
@@ -858,7 +954,8 @@ namespace Cpu {
 		if (cy < b_height - 1 and cc <= b_columns) {
 			string lavg_pre;
 			int sep = 1;
-			if (b_column_size == 2 and show_temps) { lavg_pre = "Load AVG:"; sep = 3; }
+			if (core_frequency_view) lavg_pre = frequency_layout.cell_width >= 20 ? "LAV:" : "L";
+			else if (b_column_size == 2 and show_temps) { lavg_pre = "Load AVG:"; sep = 3; }
 			else if (b_column_size == 2 or (b_column_size == 1 and show_temps)) { lavg_pre = "LAV:"; }
 			else if (b_column_size == 1 or (b_column_size == 0 and show_temps)) { lavg_pre = "L"; }
 			string lavg;
@@ -875,17 +972,23 @@ namespace Cpu {
 			// When a shorter string gets written, the remaining characters
 			// from the previous string get left behind.  This "erases" the
 			// leftover characters from the previous string.
+			if (redraw) lavg_str_len = 0;
 			if (lavg_str_len > lavg_str.length()) {
 				lavg_str += string(lavg_str_len - lavg_str.length(), ' ');
 			} else {
 				lavg_str_len = lavg_str.length();
 			}
+			if (core_frequency_view) lavg_str = uresize(lavg_str, frequency_layout.cell_width - 1);
 		#ifdef GPU_SUPPORT
 			cy = b_height - 2 - (show_gpu ? (gpus.size() - (gpu_always ? 0 : Gpu::shown)) : 0);
 		#else
 			cy = b_height - 2;
 		#endif
 			out += Mv::to(b_y + cy, b_x + cx + 1) + Theme::c("main_fg") + lavg_str;
+			if (show_power and core_frequency_view and frequency_layout.columns > 1)
+				out += Mv::to(b_y + cy, b_x + 1) + NovaColor::color(1)
+					+ ljust(uresize("Pkg " + power_text(cpu.package_power_mw), frequency_layout.cell_width - 1), frequency_layout.cell_width - 1);
+
 		}
 
 	#ifdef GPU_SUPPORT
@@ -1007,24 +1110,24 @@ namespace Gpu {
 		const bool partial = available and not (gpu.graphics_processes_available and gpu.compute_processes_available);
 		string title = " GPU processes " + to_string(visible) + "/" + to_string(gpu.processes.size()) + (partial ? " (partial)" : "") + " | Shift+U hide ";
 		string out = Mv::to(y, x) + Theme::c("cpu_box") + Symbols::div_left + Symbols::h_line * (width - 2) + Symbols::div_right;
-		out += Mv::to(y, x + 2) + NovaColor::color(0) + Fx::b + uresize(title, width - 4) + Fx::ub;
-		struct Column { string name; int width, color; };
-		vector<Column> columns{{"PID", 7, 0}};
-		if (width >= 95) columns.push_back({"USER", 10, 4});
-		if (width >= 110) columns.push_back({"DEV", 3, 0});
-		columns.push_back({"TYPE", 7, 2});
-		columns.push_back({"GPU%", 5, 0});
-		columns.push_back({"VRAM", 9, 1});
+		out += Mv::to(y, x + 2) + Theme::c("title") + Fx::b + uresize(title, width - 4) + Fx::ub;
+		struct Column { string name; int width; };
+		vector<Column> columns{{"PID", 7}};
+		if (width >= 95) columns.push_back({"USER", 10});
+		if (width >= 110) columns.push_back({"DEV", 3});
+		columns.push_back({"TYPE", 7});
+		columns.push_back({"GPU%", 5});
+		columns.push_back({"VRAM", 9});
 		if (width >= 95) {
-			columns.push_back({"CPU%", 6, 3});
-			columns.push_back({"RSS", 9, 3});
+			columns.push_back({"CPU%", 6});
+			columns.push_back({"RSS", 9});
 		}
 		int command_width = width - 2;
 		for (const auto& column : columns) command_width -= column.width + 1;
-		columns.push_back({"COMMAND", command_width, 4});
-		out += Mv::to(y + 1, x + 1) + Fx::b;
+		columns.push_back({"COMMAND", command_width});
+		out += Mv::to(y + 1, x + 1) + Theme::c("title") + Fx::b;
 		for (const auto& column : columns) {
-			out += NovaColor::color(column.color) + ljust(column.name, column.width);
+			out += ljust(column.name, column.width);
 			if (column.name != "COMMAND") out += ' ';
 		}
 		out += Fx::ub;
@@ -1044,7 +1147,10 @@ namespace Gpu {
 				else if (column.name == "CPU%") value = proc.cpu < 0 ? "--" : fmt::format("{:.1f}%", proc.cpu);
 				else if (column.name == "RSS") value = proc.host_memory < 0 ? "--" : floating_humanizer(proc.host_memory);
 				else value = Mounts::display_text(proc.command);
-				out += NovaColor::color(column.color) + ljust(value, column.width, true, true);
+				const string& color = value == "--" ? Theme::c("inactive_fg")
+					: is_in(column.name, "GPU%", "CPU%") ? NovaColor::color(0)
+					: is_in(column.name, "VRAM", "RSS") ? NovaColor::color(1) : Theme::c("main_fg");
+				out += color + ljust(value, column.width, true, true);
 				if (column.name != "COMMAND") out += ' ';
 			}
 		}
@@ -1224,10 +1330,10 @@ namespace Gpu {
 			string tx_string = floating_humanizer(gpu.pcie_tx, 0, 1, 0, 1);
 			string rx_string = floating_humanizer(gpu.pcie_rx, 0, 1, 0, 1);
 			out += Mv::to(b_y + b_height_vec[index] - 1, b_x+2) + Theme::c("div_line")
-				+ Symbols::title_left_down + Theme::c("title") + Fx::b + "TX:" + Fx::ub + Theme::c("div_line") + Symbols::title_right_down + Symbols::h_line*(b_width/2-9-tx_string.size())
-				+ Symbols::title_left_down + Theme::c("title") + Fx::b + tx_string + Fx::ub + Theme::c("div_line") + Symbols::title_right_down + (gpu.supported_functions.mem_total and gpu.supported_functions.mem_used ? Symbols::div_down : Symbols::h_line)
-				+ Symbols::title_left_down + Theme::c("title") + Fx::b + "RX:" + Fx::ub + Theme::c("div_line") + Symbols::title_right_down + Symbols::h_line*(b_width/2+b_width%2-9-rx_string.size())
-				+ Symbols::title_left_down + Theme::c("title") + Fx::b + rx_string + Fx::ub + Theme::c("div_line") + Symbols::title_right_down + Symbols::round_right_down;
+				+ Symbols::title_left_down + Theme::c("upload_start") + Fx::b + "TX:" + Fx::ub + Theme::c("div_line") + Symbols::title_right_down + Symbols::h_line*(b_width/2-9-tx_string.size())
+				+ Symbols::title_left_down + Theme::c("upload_start") + Fx::b + tx_string + Fx::ub + Theme::c("div_line") + Symbols::title_right_down + (gpu.supported_functions.mem_total and gpu.supported_functions.mem_used ? Symbols::div_down : Symbols::h_line)
+				+ Symbols::title_left_down + Theme::c("download_start") + Fx::b + "RX:" + Fx::ub + Theme::c("div_line") + Symbols::title_right_down + Symbols::h_line*(b_width/2+b_width%2-9-rx_string.size())
+				+ Symbols::title_left_down + Theme::c("download_start") + Fx::b + rx_string + Fx::ub + Theme::c("div_line") + Symbols::title_right_down + Symbols::round_right_down;
 		}
 
 		if (reserved_rows) out += process_table(gpu, shown_panels[index], x, y + height, width, reserved_rows);
@@ -1330,7 +1436,7 @@ namespace Mem {
 					for (const auto& [name, disk] : mem.disks) {
 						if (disk.io_read.empty()) continue;
 
-						io_graphs[name + "_activity"] = Draw::Graph{disks_width - 6, 1, "available", disk.io_activity, graph_symbol};
+						io_graphs[name + "_activity"] = Draw::Graph{disks_width - 6, 1, "cpu", disk.io_activity, graph_symbol};
 
 						if (io_mode) {
 							//? Create one combined graph for IO read/write if enabled
@@ -1340,17 +1446,17 @@ namespace Mem {
 								rng::transform(disk.io_read, disk.io_write, combined.begin(), std::plus<long long>());
 								io_graphs[name] = Draw::Graph{
 									disks_width - (io_mode ? 0 : 6),
-									disks_io_h, "available", combined,
+									disks_io_h, "download", combined,
 									graph_symbol, false, true, speed};
 							}
 							else {
 								io_graphs[name + "_read"] = Draw::Graph{
-									disks_width, half_height, "free",
+									disks_width, half_height, "download",
 									disk.io_read, graph_symbol, false,
 									true, speed};
 								io_graphs[name + "_write"] = Draw::Graph{
 									disks_width, disks_io_h - half_height,
-									"used", disk.io_write, graph_symbol,
+									"upload", disk.io_write, graph_symbol,
 									true, true, speed};
 							}
 						}
@@ -1427,7 +1533,7 @@ namespace Mem {
 				+ Theme::c("mem_box") + Symbols::div_right;
 			for (int row = 0; row < 3; ++row) {
 				// Clear fixed-width rows so falling values never leave old digits.
-				out += Mv::to(top + row, x + 2) + (row == 0 ? NovaColor::color(0) : row == 2 and data.stats_valid ? NovaColor::color(data.original >= data.memory ? 3 : 5) : Theme::c("main_fg"))
+				out += Mv::to(top + row, x + 2) + (row == 0 ? Theme::c("title") : row == 2 and data.stats_valid ? Theme::c(data.original >= data.memory ? "status_ok" : "status_critical") : Theme::c("main_fg"))
 					+ ljust(lines[row], mem_width - 3, true, true);
 			}
 		}
@@ -1473,7 +1579,8 @@ namespace Mem {
 						if (disks_io_h <= 3) out += Mv::to(y+1+cy, x+1+cx) + string(5, ' ') + Mv::to(y+cy + disks_io_h, x+1+cx) + string(5, ' ');
 						out += Mv::to(y+1+cy, x+1+cx) + io_graphs.at(mount + "_read")(disk.io_read, redraw or data_same) + Mv::l(disks_width)
 							+ Mv::d(1) + io_graphs.at(mount + "_write")(disk.io_write, redraw or data_same)
-							+ Mv::to(y+1+cy, x+1+cx) + human_read + Mv::to(y+cy + disks_io_h, x+1+cx) + human_write;
+							+ Mv::to(y+1+cy, x+1+cx) + Theme::c("download_start") + human_read
+							+ Mv::to(y+cy + disks_io_h, x+1+cx) + Theme::c("upload_start") + human_write + Theme::c("main_fg");
 						cy += disks_io_h;
 					}
 				}
@@ -1495,8 +1602,8 @@ namespace Mem {
 					++cy;
 					const string used = floating_humanizer(disk.used, not big_disk);
 					out += Mv::to(y+1+cy++, x+1+cx)
-						+ ljust("Used " + to_string(disk.used_percent) + "%", max(1, disks_width - (int)used.size() - 1))
-						+ ' ' + used;
+						+ NovaColor::capacity(disk.used_percent) + ljust("Used " + to_string(disk.used_percent) + "%", max(1, disks_width - (int)used.size() - 1))
+						+ ' ' + Theme::c("used_start") + used + Theme::c("main_fg");
 					const auto rate_label = [&](char direction, double rate) {
 						if (not disk.throughput_valid) return fmt::format("{} -- MiB/s", direction);
 						string label = fmt::format("{} {:.1f} MiB/s", direction, rate);
@@ -1523,15 +1630,15 @@ namespace Mem {
 						// Clear every cell because zero graph samples use cursor movement.
 						for (int row = 0; row < history_height; ++row)
 							out += Mv::to(y+1+cy+row, x+1+cx) + string(disks_width, ' ');
-						out += Mv::to(y+1+cy, x+1+cx) + Theme::c("main_fg") + ljust(label, label_width);
+						out += Mv::to(y+1+cy, x+1+cx) + Theme::c(color + "_start") + ljust(label, label_width);
 						if (not data.empty()) {
 							Draw::Graph history{history_width, history_height, color, data, graph_symbol, false, false, scale};
 							out += Mv::to(y+1+cy, x+2+cx+label_width) + history() + Theme::c("main_fg");
 						}
 						cy += history_height;
 					};
-					draw_history(read, disk.io_read, "free");
-					draw_history(write, disk.io_write, "used");
+					draw_history(read, disk.io_read, "download");
+					draw_history(write, disk.io_write, "upload");
 				}
 			}
 
@@ -1664,7 +1771,7 @@ namespace Mounts {
 		out += Mv::to(y + 1, x + 1) + Fx::b + Theme::c("title");
 		for (size_t i = 0; i < sizes.size(); ++i) {
 			if (i) out += Theme::c("div_line") + Symbols::v_line + Theme::c("title");
-			out += NovaColor::color(i == 0 ? 4 : i == 2 ? 1 : i == 3 or i == 4 ? 3 : 0) + ljust(headers[i], sizes[i]);
+			out += ljust(headers[i], sizes[i]);
 		}
 		out += Fx::ub + Mv::to(y + 2, x) + Theme::c("proc_box") + Symbols::div_left;
 		for (size_t i = 0; i < sizes.size(); ++i) {
@@ -1679,22 +1786,22 @@ namespace Mounts {
 			const auto& entry = entries[row];
 			const auto value = [&](uint64_t bytes) { return entry.valid ? format_bytes(bytes, Config::getB("base_10_sizes"), cols.size) : "--"s; };
 			const string separator = Theme::c("div_line") + Symbols::v_line + Theme::c("main_fg");
-			out += Mv::to(y + 3 + row, x + 1) + NovaColor::color(4) + cell(display_text(entry.mountpoint), cols.mount)
+			const string& usage_color = entry.valid ? NovaColor::capacity(entry.used_percent) : Theme::c("inactive_fg");
+			out += Mv::to(y + 3 + row, x + 1) + Theme::c("main_fg") + cell(display_text(entry.mountpoint), cols.mount)
 				+ separator + cell(value(entry.total), cols.size, true)
-				+ separator + NovaColor::color(1) + cell(value(entry.used), cols.used, true)
-				+ separator + (entry.valid ? NovaColor::color(NovaColor::available(entry.available)) : Theme::c("inactive_fg")) + cell(value(entry.available), cols.available, true) + separator;
-			const string usage_color = entry.valid ? NovaColor::color(NovaColor::usage(entry.used_percent)) : Theme::c("inactive_fg");
+				+ separator + (entry.valid ? Theme::c("used_start") : Theme::c("inactive_fg")) + cell(value(entry.used), cols.used, true)
+				+ separator + usage_color + cell(value(entry.available), cols.available, true) + separator;
 			if (cols.bar) {
 				const int filled = entry.valid ? clamp((int)round(entry.used_percent * cols.bar / 100), 0, cols.bar) : 0;
 				out += '[' + usage_color + string(filled, '#') + Theme::c("inactive_fg")
 					+ string(cols.bar - filled, '.') + Theme::c("main_fg") + "] ";
 			}
 			out += usage_color + cell(entry.valid ? fmt::format("{:.1f}%", entry.used_percent) : "--", cols.percent, true);
-			if (cols.type) out += separator + cell(display_text(entry.fstype), cols.type);
+			if (cols.type) out += separator + Theme::c("graph_text") + cell(display_text(entry.fstype), cols.type);
 			if (cols.device) {
 				string device = display_text(entry.device);
 				if (cmp_greater(ulen(device, true), cols.device)) device = "…" + luresize(device, cols.device - 1, true);
-				out += separator + NovaColor::color(4) + cell(device, cols.device);
+				out += separator + Theme::c("graph_text") + cell(device, cols.device);
 			}
 		}
 		if (entries.empty())
@@ -2239,6 +2346,9 @@ namespace Draw {
 		auto proc_left = Config::getB("proc_left");
 		const bool nova_layout = Config::getB("nova_layout");
 		int balanced_gpu_height = 0;
+		bool cpu_focus = false;
+		int focus_memory_minimum = 14;
+		constexpr int focus_network_height = 8;
 
 		Cpu::box.clear();
 
@@ -2260,6 +2370,7 @@ namespace Draw {
 		Cpu::width = Mem::width = Net::width = Proc::width = 0;
 		Cpu::height = Mem::height = Net::height = Proc::height = 0;
 		Cpu::redraw = Mem::redraw = Net::redraw = Proc::redraw = true;
+		Cpu::core_frequency_view = false;
 
 		Cpu::shown = s_contains(boxes, "cpu");
 	#ifdef GPU_SUPPORT
@@ -2314,9 +2425,74 @@ namespace Draw {
 		#else
 			height = max(8, (int)ceil((double)Term::height * (trim(boxes) == "cpu" ? 100 : height_p) / 100));
 		#endif
+			const bool core_temperatures = show_temp and not cpu_temp_only and Config::getB("show_coretemp");
+			frequency_layout = CpuFrequency::layout(width, Shared::coreCount, core_temperatures,
+			#ifdef GPU_SUPPORT
+				gpus_extra_height
+			#else
+				0
+			#endif
+			);
+			if (Config::getB("show_core_freq") and frequency_layout.fits_width) {
+				const bool focus_requested = nova_layout and Mem::shown and Net::shown and Proc::shown;
+			#ifdef GPU_SUPPORT
+				// Retain the previous GPU budget while the focused view borrows
+				// rows from processes/network instead of taking more GPU rows.
+				int cpu_minimum = frequency_layout.cpu_height;
+				if (focus_requested) {
+					const int columns = min(4L, Shared::coreCount);
+					const int legacy_width = columns * (2 + frequency_layout.id_width + 4 + 9 + (core_temperatures ? 6 : 0) + 1) + 1;
+					cpu_minimum = legacy_width <= width - 14
+						? (Shared::coreCount + columns - 1) / columns + 6 + gpus_extra_height : height;
+				}
+				if (balanced_gpu_height > 0 and height < cpu_minimum) {
+					const int combined = height + balanced_gpu_height * Gpu::shown;
+					if (cpu_minimum + Gpu::min_height * Gpu::shown <= combined) {
+						height = cpu_minimum;
+						balanced_gpu_height = (combined - height) / Gpu::shown;
+					}
+				}
+			#endif
+				if (focus_requested) {
+					Mounts::collect();
+					const bool swap_visible = Mem::has_swap and Config::getB("show_swap") and not Config::getB("swap_disk");
+					focus_memory_minimum += swap_visible ? 6 : 0;
+					if (Config::getB("show_zram")) {
+						Zram::collect(true);
+						// Keep space for an existing zram device's active/idle footer
+						// transition without requiring a terminal resize.
+						if (not Zram::current().devices.empty()) focus_memory_minimum += 3;
+					}
+					if (Config::getB("show_disks")) {
+						int count = 0;
+						for (const auto& entry : Mounts::current())
+							if (Config::getB("show_boot_disks") or (entry.mountpoint != "/boot" and entry.mountpoint != "/boot/efi")) ++count;
+						focus_memory_minimum = max(focus_memory_minimum, 2 + 4 * count);
+					}
+					const int process_minimum = Proc::min_height + (Config::getB("show_detailed") ? 8 : 0);
+					const int content = max(focus_memory_minimum + focus_network_height, process_minimum);
+					const int mounts = Config::getB("proc_mounts") ? clamp((int)Mounts::current().size() + 4, 5, 10) : 0;
+					const int gpu_height =
+				#ifdef GPU_SUPPORT
+						(balanced_gpu_height ? balanced_gpu_height : max(Gpu::min_height, height)) * Gpu::shown;
+				#else
+						0;
+				#endif
+					const int focused = NovaLayout::focus_cpu_height(Term::height, gpu_height, frequency_layout.cpu_height, content + mounts);
+					if (focused > 0) { height = focused; cpu_focus = true; }
+				}
+				core_frequency_view = height >= frequency_layout.cpu_height;
+			}
 			x = 1;
 			y = cpu_bottom ? Term::height - height + 1 : 1;
 
+			if (core_frequency_view) {
+				b_columns = frequency_layout.columns;
+				b_column_size = 0;
+				b_width = frequency_layout.box_width;
+				b_height = frequency_layout.box_height;
+			}
+			else {
 		#ifdef GPU_SUPPORT
 			b_columns = max(1, (int)ceil((double)(Shared::coreCount + 1) / (height - gpus_extra_height - 5)));
 		#else
@@ -2344,6 +2520,7 @@ namespace Draw {
 		#else
 			b_height = min(height - 2, (int)ceil((double)Shared::coreCount / b_columns) + 4);
 		#endif
+			}
 
 			b_x = x + width - b_width - 1;
 			b_y = y + ceil((double)(height - 2) / 2) - ceil((double)b_height / 2) + 1;
@@ -2396,7 +2573,8 @@ namespace Draw {
 				box[i] = createBox(x_vec[i], y_vec[i], width, height, Theme::c("cpu_box"), true, std::string("gpu") + (char)(shown_panels[i]+'0'), "", (shown_panels[i]+5)%10); // TODO gpu_box
 
 				b_height_vec[i] = 2 + gpu_b_height_offsets[shown_panels[i]];
-				b_width = clamp(width/2, 41, 64);
+				// Keep the statistics readable while giving GPU histories more width.
+				b_width = clamp(width/3, 41, 52);
 
 				//? Main statistics box
 				b_x_vec[i] = x_vec[i] + width - b_width - 1;
@@ -2427,6 +2605,7 @@ namespace Draw {
 			layout.body_height = body_height;
 			layout.width = Term::width;
 			layout.left_minimum = (Mem::shown ? Mem::min_height : 0) + (Net::shown ? Net::min_height : 0);
+			if (cpu_focus) layout.left_minimum = focus_memory_minimum + focus_network_height;
 			layout.height = Mounts::full_table_height(body_height, Term::width, (int)Mounts::current().size(), Config::getB("show_detailed"), Config::getB("proc_mounts"), layout.left_minimum);
 			layout.y = body_y + body_height - layout.height;
 		}
@@ -2446,7 +2625,8 @@ namespace Draw {
 		#else
 			height = ceil((double)Term::height * (100 - Cpu::height_p * Cpu::shown - Net::height_p * Net::shown) / 100) + 1;
 		#endif
-			if (nova_layout and Net::shown) {
+			if (cpu_focus) height = focus_memory_minimum;
+			else if (nova_layout and Net::shown) {
 				int minimum = min_height;
 				if (show_disks) {
 					// Allow all current disk cards at their compact, four-row size.

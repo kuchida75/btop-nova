@@ -116,5 +116,7 @@ test-zram-results.txt
 nova-zram-preview.png
 test-gpu-dots-results.txt
 nova-gpu-dots-preview.png
+test-theme-results.txt
+nova-theme-preview.png
 /dist/
 test-package-results.txt

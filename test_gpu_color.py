@@ -29,13 +29,22 @@ class Terminal:
         self.screen = pyte.Screen(width, height)
         self.stream = pyte.Stream(self.screen)
         self.decoder = codecs.getincrementaldecoder('utf-8')()
+        self.frame_tail = ''
+        self.in_frame = False
         self.drain(1.6)
 
     def drain(self, seconds):
         end = time.monotonic() + seconds
-        while time.monotonic() < end:
+        # Finish synchronized redraws that span multiple PTY reads.
+        while time.monotonic() < end or self.in_frame:
+            assert time.monotonic() < end + 3, 'Incomplete terminal redraw'
             if select.select([self.master], [], [], .05)[0]:
-                try: self.stream.feed(self.decoder.decode(os.read(self.master, 65536)))
+                try:
+                    data = self.decoder.decode(os.read(self.master, 65536))
+                    markers = re.findall(r'\x1b\[\?2026([hl])', self.frame_tail + data)
+                    if markers: self.in_frame = markers[-1] == 'h'
+                    self.frame_tail = (self.frame_tail + data)[-7:]
+                    self.stream.feed(data)
                 except OSError: break
         assert self.proc.poll() is None, self.text()
 
@@ -104,29 +113,30 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-color-', dir=root) as tmp:
                     continue
                 gpu_row = find_line(t, 'GCLK ')
                 first = gpu_row - 1
-                assert colour_at(t, first, 'GPU ') == '00bcd4', t.screen.buffer[first]
-                assert colour_at(t, first, 'VRAM ') == 'ffcd4b', t.screen.buffer[first]
-                assert colour_at(t, gpu_row, 'GCLK ') == 'd772e5'
-                assert colour_at(t, gpu_row, 'MCLK ') == '52c878'
+                assert colour_at(t, first, 'GPU ') == '5bc4d6', t.screen.buffer[first]
+                assert colour_at(t, first, 'VRAM ') == '81a8f8', t.screen.buffer[first]
+                assert colour_at(t, gpu_row, 'GCLK ') == 'c3a6e8'
+                assert colour_at(t, gpu_row, 'MCLK ') == '72c9a0'
                 table = find_line(t, 'MOUNTED ON')
                 assert table > row and find_line(t, '/boot/efi') > table, t.text()
                 efi = find_line(t, '/boot/efi')
-                assert colour_at(t, efi, '/boot/efi') == '6ba8ff'
-                assert any(c.fg == '52c878' for c in t.screen.buffer[efi].values())
+                assert colour_at(t, efi, '/boot/efi') == 'dbe4ef'
+                assert any(c.fg == '72c9a0' for c in t.screen.buffer[efi].values())
                 # The mount usage palette is tested with host-independent
                 # synthetic sizes in tests/nova_mounts.cpp.
-                assert any(c.fg == 'ffcd4b' for c in t.screen.buffer[table].values()), t.text()
+                assert colour_at(t, table, 'MOUNTED ON') == colour_at(t, table, 'USED') == colour_at(t, table, 'AVAIL') == 'f0f6fc'
                 # Check the plot itself, not merely coloured legend text.
                 separator = find_line(t, 'GPU processes ')
-                plot_colours = {c.fg for r in range(gpu_row+1, separator-1) for x,c in t.screen.buffer[r].items() if x < 134 and len(c.data) == 1 and 0x2801 <= ord(c.data) <= 0x28ff}
-                assert {'00bcd4', 'ffcd4b', 'd772e5', '52c878'} <= plot_colours, plot_colours
+                stats_col = t.screen.display[find_line(t, 'Nova fixture GPU')].index('╭', 1)
+                plot_colours = {c.fg for r in range(gpu_row+1, separator-1) for x,c in t.screen.buffer[r].items() if x < stats_col and len(c.data) == 1 and 0x2801 <= ord(c.data) <= 0x28ff}
+                assert {'5bc4d6', '81a8f8', 'c3a6e8', '72c9a0'} <= plot_colours, plot_colours
                 (root / 'test-screen-gpu-color-200x100.txt').write_text(t.text())
                 t.drain(4)
                 # Export a faithful terminal preview, with test data explicitly labelled.
                 from PIL import Image, ImageDraw, ImageFont
                 indices = list(range(first-1, separator+9)) + [None] + list(range(table-1, efi+4))
                 font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf', 13)
-                preview = Image.new('RGB', (1600, (len(indices)+3)*17), '#101218')
+                preview = Image.new('RGB', (1600, (len(indices)+3)*17), '#111827')
                 draw = ImageDraw.Draw(preview)
                 draw.text((8, 4), 'Nova btop colour/layout preview — synthetic GPU test data; actual host mounts', font=font, fill='white')
                 for dest, src in enumerate(indices, 2):
@@ -189,7 +199,8 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-color-', dir=root) as tmp:
                 check(t)
                 first = find_line(t, 'GCLK ')+1
                 end = find_line(t, 'GPU processes ')-1
-                plot = [c for row in range(first, end) for x,c in t.screen.buffer[row].items() if 5 <= x < 134]
+                stats_col = t.screen.display[find_line(t, 'Nova fixture GPU')].index('╭', 1)
+                plot = [c for row in range(first, end) for x,c in t.screen.buffer[row].items() if 5 <= x < stats_col]
                 dots = [c for c in plot if len(c.data) == 1 and 0x2801 <= ord(c.data) <= 0x28ff]
                 if symbols == 'tty':
                     assert not dots and any(c.data == '.' and c.fg != 'default' for c in plot), t.text()
