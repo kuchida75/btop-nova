@@ -1,4 +1,4 @@
-// Nova GPU chart geometry. Series: load, allocated VRAM, graphics clock, memory clock.
+// Nova GPU chart geometry. Series: load, allocated VRAM, graphics clock, memory clock, power.
 #pragma once
 #include <algorithm>
 #include <array>
@@ -9,8 +9,9 @@
 
 namespace GpuHistory {
 struct Sample {
-	std::array<long long, 4> values{-1, -1, -1, -1};
+	std::array<long long, 5> values{-1, -1, -1, -1, -1};
 	uint64_t timestamp{}; // steady-clock milliseconds
+	long long milliwatts = -1; // Raw power; normalize only when rendering the visible scale.
 };
 struct Cell {
 	unsigned char series{}; // bitmask; zero means background
@@ -34,7 +35,7 @@ inline std::vector<Cell> raster(const std::deque<Sample>& samples, int width, in
 		cell.series |= 1 << series;
 		cell.dots |= braille ? bits[x % 2][y % 4] : 1;
 	};
-	for (int series = 3; series >= 0; --series) {
+	for (int series = 4; series >= 0; --series) {
 		int previous = -1;
 		for (int col = 0; col < count; ++col) {
 			const auto value = samples[first + col].values[series];
@@ -61,8 +62,16 @@ inline std::vector<Cell> raster(const std::deque<Sample>& samples, int width, in
 	}
 	return result;
 }
+// Keep a stable scale at least as large as the driver power limit. Visible
+// peaks can extend it in 50 W steps. Missing readings never become zeros.
+inline long long power_scale(const std::deque<Sample>& samples, int visible, long long limit) {
+	long long peak = std::max(0ll, limit);
+	const size_t first = samples.size() - std::min(samples.size(), static_cast<size_t>(std::max(0, visible)));
+	for (size_t i = first; i < samples.size(); ++i) peak = std::max(peak, samples[i].milliwatts);
+	return std::max(50000ll, ((peak + 49999) / 50000) * 50000);
+}
 inline int process_rows(int height, int statistics_height, bool enabled) {
-	// Preserve the whole statistics box, two legend rows and at least 3 plot rows.
+	// Preserve the whole statistics box, three legend rows and at least 3 plot rows.
 	if (not enabled) return 0;
 	return std::clamp(height - std::max(statistics_height + 2, 9), 0, 9);
 }

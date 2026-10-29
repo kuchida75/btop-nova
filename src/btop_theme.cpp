@@ -93,6 +93,7 @@ namespace Theme {
 		{ "gpu_vram", "#d9626d" },
 		{ "gpu_clock", "#74e6fc" },
 		{ "gpu_mem_clock", "#b5e685" },
+		{ "gpu_power", "#e5ba73" },
 		{ "status_ok", "#b5e685" },
 		{ "status_warning", "#cbc06c" },
 		{ "status_critical", "#dc4c4c" }
@@ -118,6 +119,7 @@ namespace Theme {
 		{ "gpu_vram", "\x1b[94m" },
 		{ "gpu_clock", "\x1b[95m" },
 		{ "gpu_mem_clock", "\x1b[92m" },
+		{ "gpu_power", "\x1b[93m" },
 		{ "status_ok", "\x1b[92m" },
 		{ "status_warning", "\x1b[93m" },
 		{ "status_critical", "\x1b[91m" },
@@ -301,10 +303,10 @@ namespace Theme {
 			}
 			// Older themes inherit Nova roles from their own palette. Resolving
 			// them on every reload also updates live charts when themes change.
-			for (const auto& [role, base] : array<std::pair<string, string>, 7>{{
+			for (const auto& [role, base] : array<std::pair<string, string>, 8>{{
 				{"gpu_load", "cpu_start"}, {"gpu_vram", "used_start"},
 				{"gpu_clock", "cached_start"}, {"gpu_mem_clock", "free_start"},
-				{"status_ok", "free_start"}, {"status_warning", "temp_mid"}, {"status_critical", "temp_end"}
+				{"gpu_power", "temp_mid"}, {"status_ok", "free_start"}, {"status_warning", "temp_mid"}, {"status_critical", "temp_end"}
 			}}) {
 				if (source.contains(role) and not source.at(role).empty()) continue;
 				const string key = colors.at(base).empty() ? "title" : base;

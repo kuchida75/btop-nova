@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-install-', dir=root) as tmp:
         output = subprocess.check_output([sys.executable, str(root/'install_nova.py'), '--prefix', str(prefix), '--bashrc', str(bashrc), *options], text=True)
         return json.loads(output)
     manifest = install()
-    assert manifest['version'] == '1.3.0-nova-io18', manifest
+    assert manifest['version'] == '1.3.0-nova-io19', manifest
     new = values(conf.read_text()); original = values(old)
     for key, value in original.items():
         if key == 'cpu_logical_graphs': continue
@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-install-', dir=root) as tmp:
     assert new['show_cpu_power'] == 'False'
     assert 'cpu_logical_graphs' not in new
     command = prefix/'bin/btop'
-    assert '1.3.0-nova-io18' in subprocess.check_output([str(command), '--version'], text=True)
+    assert '1.3.0-nova-io19' in subprocess.check_output([str(command), '--version'], text=True)
     assert values(conf.read_text())['io_mode'] == 'False'
     shell_hash = digest(bashrc)
     release = pathlib.Path(manifest['release'])/'bin/btop'

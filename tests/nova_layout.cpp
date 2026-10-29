@@ -8,6 +8,15 @@ int main() {
 		const auto compact = NovaLayout::cpu_height(height);
 		assert(compact >= std::min(8, height) and compact <= height);
 	}
+	assert(NovaLayout::gpu_height(24, 87, 17, 1, 29) == 27);
+	assert(NovaLayout::gpu_height(24, 71, 17, 1, 29) == 25);
+	assert(NovaLayout::gpu_height(24, 70, 17, 1, 29) == 24);
+	assert(NovaLayout::gpu_height(24, 87, 17, 0, 29) == 24);
+	for (int total = 24; total < 200; ++total) for (int count : {1,2,3,6}) {
+		const int extra = NovaLayout::gpu_height(11, total, 17, count, 29) - 11;
+		assert(extra >= 0 && extra <= 3);
+		assert(extra == 0 || total - 17 - (11 + extra) * count >= 29);
+	}
 	assert(NovaLayout::cpu_height(21) == 14);
 	assert(NovaLayout::focus_cpu_height(100, 28, 17, 29) == 17);
 	assert(NovaLayout::focus_cpu_height(60, 12, 17, 29) == 17);

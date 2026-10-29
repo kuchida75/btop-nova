@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-dots-', dir=root) as tmp:
         dots = [cell for cell in plot if len(cell.data) == 1 and 0x2801 <= ord(cell.data) <= 0x28ff]
         (root/'test-screen-gpu-dots.txt').write_text(term.text())
         assert len(dots) > 100, (len(dots), stats_x, legend, table, term.text())
-        assert {'5bc4d6','81a8f8','c3a6e8','72c9a0'} <= {cell.fg for cell in dots}
+        assert {'5bc4d6','81a8f8','c3a6e8','72c9a0','e5ba73'} <= {cell.fg for cell in dots}
         assert not any(cell.data in '─│' for cell in plot)
         # Fine curves occupy individual left/right dot columns within a cell.
         masks = [ord(cell.data)-0x2800 for cell in dots]
@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-dots-', dir=root) as tmp:
         assert 'GCLK ' not in term.text() and 'VRAM used ' in term.text()
         term.resize(146,30)
         assert 'GCLK ' in term.text() and 'GPU processes ' in term.text()
-        print('Dense four-colour Braille curves, compact GPU statistics at 80–200 columns, process list and narrow-window fallback/restoration passed')
+        print('Dense five-colour Braille curves, compact GPU statistics at 80–200 columns, process list and narrow-window fallback/restoration passed')
     finally: term.close()
     ascii_config = config_with(shown_boxes='"gpu0"', gpu_always_visible='True', gpu_nvtop_graph='True', gpu_processes='True',
                                graph_symbol_gpu='"default"', graph_symbol='"tty"', tty_mode='False')

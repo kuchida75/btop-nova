@@ -1,3 +1,15 @@
+GPU board wattage and roomier history (io19):
+The GPU dot chart adds an amber PWR trace from successful NVIDIA NVML power
+samples, with a labelled watt scale. The scale is at least the driver power
+limit and expands in 50 W steps for visible peaks. Unknown samples show --W
+and leave gaps; actual zero remains 0.0W. The other four GPU curves retain
+their 0-100% scale. Shift+N still toggles the whole coloured chart.
+Nova's full CPU/GPU/memory/network/process layout gives each GPU up to three
+more rows, shortening network/process panels while preserving their minimums,
+RAM/disk rows, CPU MHz readings, process details and the full-width mounts.
+Short windows automatically reduce the extra height. No new permission or
+configuration changes are needed for the GPU wattage trace.
+
 Nova btop custom build
 
 Base: upstream v1.3.0, commit 36842a3bccfb78f5c27642435bff387b42f7d13b

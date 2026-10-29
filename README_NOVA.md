@@ -1,7 +1,7 @@
 # Nova btop
 
 A Linux fork of [aristocratos/btop](https://github.com/aristocratos/btop), based
-on upstream v1.3.0. Current Nova version: **1.3.0-nova-io18**.
+on upstream v1.3.0. Current Nova version: **1.3.0-nova-io19**.
 
 ## AI disclosure and release privacy
 
@@ -20,7 +20,8 @@ the built archives before upload.
 
 The default Nova theme uses a dark slate background, light text and matching
 panel borders. Activity and incoming I/O are cyan; used memory and outgoing
-I/O are blue. GPU clock curves use lavender and green, with matching legends.
+I/O are blue. GPU clock curves use lavender and green; GPU watts use amber,
+with matching legends.
 Tables use neutral headings and identity text; only metrics and alerts are
 coloured. Capacity is green below 80% used, amber from 80%, and red from 90%.
 Small boot/EFI partitions use those same percentage thresholds.
@@ -65,7 +66,8 @@ CPU graph choices and other display preferences.
 - With MHz and Nova layout enabled, the full CPU/GPU/memory/network/process
   view fits the CPU panel to its per-core table: 17 rows for 32 threads.
   Spare vertical space goes to network graphs and the process viewport.
-  GPU height and the full-width mounts table are retained. Memory and disk
+  GPU histories borrow up to three extra rows from network/process space when
+  the lower panels can still fit. The full-width mounts table, memory and disk
   rows are reserved when needed; short windows restore the ordinary layout.
   Process sorting, scrolling, filtering and details keep their existing behavior.
 - Three compact value columns leave the remaining width to the CPU history.
@@ -76,8 +78,12 @@ CPU graph choices and other display preferences.
   of the width, bounded to 41–52 columns so small windows retain readable values.
 - Mounted disks retain capacity/usage alongside live read and write MiB/s and
   separate histories. Rates use measured elapsed time between kernel samples.
-- A persistent GPU panel with four coloured Braille dot curves: GPU load,
-  allocated VRAM, graphics clock and memory clock. Each character contains
+- A persistent GPU panel with five coloured Braille dot curves: GPU load,
+  allocated VRAM, graphics clock, memory clock and board power. The amber
+  **PWR** trace has a labelled watt scale, at least the driver power limit,
+  extended in 50 W steps for higher visible readings. Missing measurements
+  show `--W` and gaps; real zero remains `0.0W`. This history uses NVIDIA NVML
+  alongside the existing four metrics. Each character contains
   two horizontal points and four vertical dot levels.
 - A NVIDIA GPU process summary beneath the graph: graphics/compute clients,
   GPU activity, VRAM and available host process information.
@@ -86,7 +92,7 @@ CPU graph choices and other display preferences.
 - An optional zram compression summary under RAM. Idle swap headers do not
   keep it visible; it returns automatically when real swap pages are used.
 
-![Four-colour dot chart, with simulated GPU readings](Img/nova-gpu-dots.png)
+![Dot chart from an earlier version, with simulated GPU readings](Img/nova-gpu-dots.png)
 
 The preview uses simulated driver readings. Hardware GPU values require a
 working driver and its monitoring library. The NVIDIA process summary uses
@@ -119,8 +125,8 @@ sha256sum --ignore-missing -c SHA256SUMS
 ### Portable user installation (recommended on the existing Nova host)
 
 ```sh
-tar -xzf btop-nova-1.3.0-nova-io18-linux-amd64.tar.gz
-cd btop-nova-1.3.0-nova-io18-linux-amd64
+tar -xzf btop-nova-1.3.0-nova-io19-linux-amd64.tar.gz
+cd btop-nova-1.3.0-nova-io19-linux-amd64
 python3 install_nova.py
 ~/.local/bin/btop
 ```
@@ -146,7 +152,7 @@ Bash session. `/usr/bin/btop` remains available throughout.
 ### Ubuntu/Debian package
 
 ```sh
-sudo apt install ./btop-nova_1.3.0+nova.io18-1_amd64.deb
+sudo apt install ./btop-nova_1.3.0+nova.io19-1_amd64.deb
 btop-nova
 ```
 

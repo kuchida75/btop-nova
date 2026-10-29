@@ -15,7 +15,7 @@ def contrast(fg, bg):
     a,b = sorted((luminance(fg),luminance(bg)))
     return (b+.05)/(a+.05)
 
-for key in ('main_fg','title','hi_fg','inactive_fg','graph_text','gpu_load','gpu_vram','gpu_clock','gpu_mem_clock','status_ok','status_warning','status_critical'):
+for key in ('main_fg','title','hi_fg','inactive_fg','graph_text','gpu_load','gpu_vram','gpu_clock','gpu_mem_clock','gpu_power','status_ok','status_warning','status_critical'):
     assert contrast(palette[key], palette['main_bg']) >= 4.5, key
 assert contrast(palette['selected_fg'], palette['selected_bg']) >= 4.5
 assert palette['gpu_load'] == palette['cpu_start'] == palette['download_start']

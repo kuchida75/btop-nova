@@ -10,6 +10,13 @@ inline int cpu_height(int previous) {
 	return std::min(previous, std::max(8, previous - previous / 3));
 }
 
+// Borrow up to three rows per GPU from the lower body, preserving its full
+// memory/disk, network, process-details and mounts minimums on short screens.
+inline int gpu_height(int previous, int total, int cpu, int count, int body_minimum) {
+	if (count <= 0) return previous;
+	return previous + std::clamp((total - cpu - previous * count - body_minimum) / count, 0, 3);
+}
+
 inline int memory_height(int previous, int available, int minimum, int network_minimum, bool swap_visible) {
 	const int maximum = std::max(1, available - network_minimum);
 	minimum = std::min(minimum, maximum);

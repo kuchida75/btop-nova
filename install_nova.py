@@ -65,7 +65,7 @@ new_preferences = {
     'proc_mounts': ('True', 'Live local mount table below processes; Shift+M toggles.'),
     'show_boot_disks': ('False', 'Show mounted boot/EFI partitions; Shift+B toggles.'),
     'gpu_always_visible': ('True', 'Keep the first detected GPU panel visible across presets.'),
-    'gpu_nvtop_graph': ('True', 'Coloured GPU/VRAM/clock histories; Shift+N toggles.'),
+    'gpu_nvtop_graph': ('True', 'Coloured GPU/VRAM/clock/power histories; Shift+N toggles.'),
     'gpu_processes': ('True', 'GPU processes below the chart; Shift+U toggles.'),
     'gpu_split_vram': ('True', 'GPU load above, allocated VRAM histogram below; Shift+V toggles.'),
 }
@@ -94,7 +94,7 @@ if ! grep -q '^gpu_always_visible[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf
     printf '\\n#* Keep the first detected GPU panel visible.\\ngpu_always_visible = True\\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
 fi
 if ! grep -q '^gpu_nvtop_graph[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
-    printf '\\n#* Coloured GPU/VRAM/clock histories.\\ngpu_nvtop_graph = True\\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
+    printf '\\n#* Coloured GPU/VRAM/clock/power histories.\\ngpu_nvtop_graph = True\\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"
 fi
 if ! grep -q '^gpu_processes[[:space:]]*=' "$XDG_CONFIG_HOME/btop/btop.conf"; then
     printf '\\n#* GPU processes below the chart.\\ngpu_processes = True\\n' >> "$XDG_CONFIG_HOME/btop/btop.conf"

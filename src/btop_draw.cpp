@@ -55,7 +55,7 @@ namespace rng = std::ranges;
 
 namespace NovaColor {
 	const string& color(int index) {
-		static const array<string, 4> roles{"gpu_load", "gpu_vram", "gpu_clock", "gpu_mem_clock"};
+		static const array<string, 5> roles{"gpu_load", "gpu_vram", "gpu_clock", "gpu_mem_clock", "gpu_power"};
 		return Theme::c(roles.at(index));
 	}
 	const string& capacity(double used_percent) {
@@ -1056,7 +1056,7 @@ namespace Gpu {
 	vector<string> box = {};
 
 	string history_chart(const gpu_info& gpu, int x, int y, int width, int height) {
-		const int plot_width = width - 4, plot_height = height - 3;
+		const int plot_width = width - 4, plot_height = height - 4;
 		if (plot_width < 12 or plot_height < 3) return "";
 		const array<string, 4> names{"GPU", "VRAM", "GCLK", "MCLK"};
 		const auto values = gpu.history.empty() ? GpuHistory::Sample{}.values : gpu.history.back().values;
@@ -1074,14 +1074,22 @@ namespace Gpu {
 		const auto& symbol = Config::getS("graph_symbol_gpu");
 		const bool tty = Config::getB("tty_mode") or symbol == "tty"
 			or (symbol == "default" and Config::getS("graph_symbol") == "tty");
-		const auto pixels = GpuHistory::raster(gpu.history, plot_width, plot_height, not tty);
+		const int visible = GpuHistory::visible_samples(gpu.history.size(), plot_width, not tty);
+		const auto scale = GpuHistory::power_scale(gpu.history, visible, gpu.pwr_max_usage);
+		std::deque<GpuHistory::Sample> history(gpu.history.end() - visible, gpu.history.end());
+		for (auto& sample : history) sample.values[4] = sample.milliwatts < 0 ? -1 : (sample.milliwatts * 100 + scale / 2) / scale;
+		const auto mw = history.empty() ? -1 : history.back().milliwatts;
+		out += Mv::to(y + 2, x) + NovaColor::color(4) + Fx::b
+			+ ljust(uresize("PWR " + Cpu::power_text(mw) + " | 0-" + to_string(scale / 1000) + "W", width), width) + Fx::ub;
+		const auto pixels = GpuHistory::raster(history, plot_width, plot_height, not tty);
 		for (int row = 0; row < plot_height; ++row) {
-			out += Mv::to(y + 2 + row, x) + Theme::c("main_fg")
+			out += Mv::to(y + 3 + row, x) + Theme::c("main_fg")
 				+ rjust(row == 0 ? "100" : row == plot_height - 1 ? "0" : row == (plot_height - 1) / 2 ? "50" : "", 3) + Theme::c("div_line") + (tty ? "|" : "│");
 			for (int col = 0; col < plot_width; ++col) {
 				const auto& pixel = pixels[row * plot_width + col];
 				if (pixel.series) {
-					int series = 0;
+					// Prefer watts where curves meet; retain every series' dots.
+					int series = pixel.series & 16 ? 4 : 0;
 					while (not (pixel.series & (1 << series))) ++series;
 					out += NovaColor::color(series);
 					if (tty) out += '.';
@@ -1185,7 +1193,7 @@ namespace Gpu {
 		const int process_rows = GpuHistory::process_rows(Gpu::height, b_height_vec[index], Config::getB("gpu_processes"));
 		const int reserved_rows = process_rows >= 3 ? process_rows : 0;
 		const int height = Gpu::height - reserved_rows;
-		const bool nvtop_graph = Config::getB("gpu_nvtop_graph") and not gpu.history.empty() and b_x - x - 1 >= 28 and height >= 9;
+		const bool nvtop_graph = Config::getB("gpu_nvtop_graph") and not gpu.history.empty() and b_x - x - 1 >= 28 and height >= 10;
 		const bool split_vram = Config::getB("gpu_split_vram");
 		const bool single_graph = not split_vram and not Config::getB("gpu_mirror_graph");
 		const bool has_vram = gpu.supported_functions.mem_used and gpu.supported_functions.mem_total
@@ -2348,6 +2356,7 @@ namespace Draw {
 		int balanced_gpu_height = 0;
 		bool cpu_focus = false;
 		int focus_memory_minimum = 14;
+		int focus_body_minimum = 0;
 		constexpr int focus_network_height = 8;
 
 		Cpu::box.clear();
@@ -2395,6 +2404,28 @@ namespace Draw {
 		Net::shown = s_contains(boxes, "net");
 		Proc::shown = s_contains(boxes, "proc");
 		Mounts::layout = {};
+
+		if (nova_layout and Mem::shown and Net::shown and Proc::shown) {
+			Mounts::collect();
+			const bool swap_visible = Mem::has_swap and Config::getB("show_swap") and not Config::getB("swap_disk");
+			focus_memory_minimum += swap_visible ? 6 : 0;
+			if (Config::getB("show_zram")) {
+				Zram::collect(true);
+				// Keep space for an existing zram device's active/idle footer
+				// transition without requiring a terminal resize.
+				if (not Zram::current().devices.empty()) focus_memory_minimum += 3;
+			}
+			if (Config::getB("show_disks")) {
+				int count = 0;
+				for (const auto& entry : Mounts::current())
+					if (Config::getB("show_boot_disks") or (entry.mountpoint != "/boot" and entry.mountpoint != "/boot/efi")) ++count;
+				focus_memory_minimum = max(focus_memory_minimum, 2 + 4 * count);
+			}
+			const int process_minimum = Proc::min_height + (Config::getB("show_detailed") ? 8 : 0);
+			const int content = max(focus_memory_minimum + focus_network_height, process_minimum);
+			const int mounts = Config::getB("proc_mounts") ? clamp((int)Mounts::current().size() + 4, 5, 10) : 0;
+			focus_body_minimum = content + mounts;
+		}
 
 		//* Calculate and draw cpu box outlines
 		if (Cpu::shown) {
@@ -2454,31 +2485,13 @@ namespace Draw {
 				}
 			#endif
 				if (focus_requested) {
-					Mounts::collect();
-					const bool swap_visible = Mem::has_swap and Config::getB("show_swap") and not Config::getB("swap_disk");
-					focus_memory_minimum += swap_visible ? 6 : 0;
-					if (Config::getB("show_zram")) {
-						Zram::collect(true);
-						// Keep space for an existing zram device's active/idle footer
-						// transition without requiring a terminal resize.
-						if (not Zram::current().devices.empty()) focus_memory_minimum += 3;
-					}
-					if (Config::getB("show_disks")) {
-						int count = 0;
-						for (const auto& entry : Mounts::current())
-							if (Config::getB("show_boot_disks") or (entry.mountpoint != "/boot" and entry.mountpoint != "/boot/efi")) ++count;
-						focus_memory_minimum = max(focus_memory_minimum, 2 + 4 * count);
-					}
-					const int process_minimum = Proc::min_height + (Config::getB("show_detailed") ? 8 : 0);
-					const int content = max(focus_memory_minimum + focus_network_height, process_minimum);
-					const int mounts = Config::getB("proc_mounts") ? clamp((int)Mounts::current().size() + 4, 5, 10) : 0;
 					const int gpu_height =
 				#ifdef GPU_SUPPORT
 						(balanced_gpu_height ? balanced_gpu_height : max(Gpu::min_height, height)) * Gpu::shown;
 				#else
 						0;
 				#endif
-					const int focused = NovaLayout::focus_cpu_height(Term::height, gpu_height, frequency_layout.cpu_height, content + mounts);
+					const int focused = NovaLayout::focus_cpu_height(Term::height, gpu_height, frequency_layout.cpu_height, focus_body_minimum);
 					if (focused > 0) { height = focused; cpu_focus = true; }
 				}
 				core_frequency_view = height >= frequency_layout.cpu_height;
@@ -2550,6 +2563,10 @@ namespace Draw {
 			gpu_meter_vec.resize(shown);
 			pwr_meter_vec.resize(shown);
 			redraw.resize(shown);
+			if (nova_layout and Cpu::shown and Mem::shown and Net::shown and Proc::shown) {
+				const int previous = balanced_gpu_height ? balanced_gpu_height : max(min_height, Cpu::height);
+				balanced_gpu_height = NovaLayout::gpu_height(previous, Term::height, Cpu::height, shown, focus_body_minimum);
+			}
 			for (auto i = 0; i < shown; ++i) {
 				redraw[i] = true;
 

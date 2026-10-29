@@ -216,7 +216,7 @@ namespace Config {
 
 		{"gpu_always_visible", "#* Keep the first detected GPU panel visible, including across presets. Disable to allow the 5 key to hide it."},
 
-		{"gpu_nvtop_graph", "#* Coloured GPU/VRAM/clock Braille dot histories. Shift+N toggles; small charts fall back to GPU/VRAM."},
+		{"gpu_nvtop_graph", "#* Coloured GPU/VRAM/clock/power Braille dot histories. Shift+N toggles; small charts fall back to GPU/VRAM."},
 		{"gpu_processes", "#* (NVIDIA Linux) GPU process table under the chart. Shift+U toggles; hidden when space is insufficient."},
 		{"gpu_split_vram", "#* Show GPU load above and allocated VRAM percent below as independent 0-100% histories. Toggle with Shift+V."},
 

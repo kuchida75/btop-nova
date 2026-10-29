@@ -99,7 +99,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-color-', dir=root) as tmp:
         subprocess.run(['gcc', '-shared', '-fPIC', '-Wall', '-Wextra', '-Werror', *flags, str(root / 'tests/nova_nvml_fixture.c'), '-o', str(path / 'libnvidia-ml.so')], check=True)
         libraries[api] = path
     target = subprocess.Popen([sys.executable, '-c', 'while True: pass'])
-    extra = {'NOVA_FIXTURE_PID': str(target.pid)}
+    extra = {'NOVA_FIXTURE_PID': str(target.pid), 'NOVA_FIXTURE_POWER': '150000'}
     common = dict(nova_layout="False", io_mode='False', proc_mounts='True', gpu_always_visible='True', gpu_split_vram='True', gpu_nvtop_graph='True', gpu_processes='True', update_ms='500', shown_boxes='"cpu mem net proc"')
     try:
         for api in ('v3', 'v2', 'v1'):
@@ -129,7 +129,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-gpu-color-', dir=root) as tmp:
                 separator = find_line(t, 'GPU processes ')
                 stats_col = t.screen.display[find_line(t, 'Nova fixture GPU')].index('╭', 1)
                 plot_colours = {c.fg for r in range(gpu_row+1, separator-1) for x,c in t.screen.buffer[r].items() if x < stats_col and len(c.data) == 1 and 0x2801 <= ord(c.data) <= 0x28ff}
-                assert {'5bc4d6', '81a8f8', 'c3a6e8', '72c9a0'} <= plot_colours, plot_colours
+                assert {'5bc4d6', '81a8f8', 'c3a6e8', '72c9a0', 'e5ba73'} <= plot_colours, plot_colours
                 (root / 'test-screen-gpu-color-200x100.txt').write_text(t.text())
                 t.drain(4)
                 # Export a faithful terminal preview, with test data explicitly labelled.

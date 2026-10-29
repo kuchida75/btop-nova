@@ -1,6 +1,6 @@
 # Install Nova btop on Nova PC
 
-**[AI generated]** These instructions install the io18 Nova fork on an Ubuntu
+**[AI generated]** These instructions install the io19 Nova fork on an Ubuntu
 Linux PC as your normal user. Build on Nova PC so the executable uses its own
 system libraries. CPU count, mounts and network interfaces are discovered
 locally; a working GPU driver supplies the GPU readings.
@@ -39,7 +39,7 @@ make -j2 THREADS=2 QUIET=true
 git rev-parse HEAD
 ```
 
-The version should be `1.3.0-nova-io18` for this revision. Keep the printed
+The version should be `1.3.0-nova-io19` for this revision. Keep the printed
 commit ID when reporting an issue. A fresh clone keeps any existing source
 checkout and its local changes intact.
 

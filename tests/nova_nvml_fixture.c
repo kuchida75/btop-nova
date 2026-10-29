@@ -28,7 +28,17 @@ int nvmlDeviceGetClockInfo(void *device, int kind, unsigned *value) {
     *value = getenv("NOVA_FIXTURE_DOT_WAVE") ? (kind == 0 ? 450 + wave()*30 : 405 + wave()*20) : (kind == 0 ? 900 : 405);
     return 0;
 }
-int nvmlDeviceGetPowerUsage(void *device, unsigned *value) { (void)device; *value = 40000; return 0; }
+int nvmlDeviceGetPowerUsage(void *device, unsigned *value) {
+    (void)device;
+    const char *mode = getenv("NOVA_FIXTURE_POWER");
+    /* Change mode live through a test-owned file to verify missing/stale data. */
+    const char *file = getenv("NOVA_FIXTURE_POWER_FILE");
+    char buffer[32];
+    if (file) { FILE *input = fopen(file, "r"); if (input) { if (fscanf(input, "%31s", buffer) == 1) mode = buffer; fclose(input); } }
+    if (mode && mode[0] == 'x') return 3;
+    *value = mode ? (unsigned)strtoul(mode, NULL, 10) : getenv("NOVA_FIXTURE_DOT_WAVE") ? 30000 + wave()*5000 : 40000;
+    return 0;
+}
 int nvmlDeviceGetPowerState(void *device, int *value) { (void)device; *value = 8; return 0; }
 int nvmlDeviceGetTemperature(void *device, int kind, unsigned *value) { (void)device; (void)kind; *value = 30; return 0; }
 int nvmlDeviceGetMemoryInfo(void *device, memory_info *value) {
