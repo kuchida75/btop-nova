@@ -19,6 +19,7 @@ tab-size = 4
 #pragma once
 
 #include "btop_gpu_history.hpp"
+#include "btop_net_history.hpp"
 #include "btop_cpu_power.hpp"
 #include "btop_zram.hpp"
 #include <array>
@@ -304,6 +305,7 @@ namespace Net {
 	struct net_info {
 		std::unordered_map<string, deque<long long>> bandwidth = { {"download", {}}, {"upload", {}} };
 		std::unordered_map<string, net_stat> stat = { {"download", {}}, {"upload", {}} };
+		deque<NetHistory::Sample> history;
 		string ipv4{};      // defaults to ""
 		string ipv6{};      // defaults to ""
 		bool connected{};

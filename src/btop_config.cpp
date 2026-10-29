@@ -193,6 +193,8 @@ namespace Config {
 		{"io_graph_speeds", 	"#* Set the top speed for the io graphs in MiB/s (100 by default), use format \"mountpoint:speed\" separate disks with whitespace \" \".\n"
 								"#* Example: \"/mnt/media:100 /:20 /boot:1\"."},
 
+		{"net_dot_graph", "#* Upward coloured download/upload dot history; small panels use the earlier graph."},
+
 		{"net_download", 		"#* Set fixed values for network graphs in Mebibits. Is only used if net_auto is also set to False."},
 
 		{"net_upload", ""},
@@ -308,6 +310,7 @@ namespace Config {
 		{"io_mode", false},
 		{"base_10_sizes", false},
 		{"io_graph_combined", false},
+		{"net_dot_graph", true},
 		{"net_auto", true},
 		{"net_sync", true},
 		{"show_battery", true},

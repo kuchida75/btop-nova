@@ -79,7 +79,7 @@ namespace Global {
 		{"#801414", "██████╔╝   ██║   ╚██████╔╝██║        ╚═╝    ╚═╝"},
 		{"#000000", "╚═════╝    ╚═╝    ╚═════╝ ╚═╝"},
 	};
-	const string Version = "1.3.0-nova-io19";
+	const string Version = "1.3.0-nova-io20";
 
 	int coreCount;
 	string overlay;

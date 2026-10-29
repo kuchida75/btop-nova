@@ -2400,6 +2400,8 @@ namespace Net {
 
 			//? Get total recieved and transmitted bytes + device address if no ip was found
 			for (const auto& iface : interfaces) {
+				NetHistory::Sample sample;
+				sample.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 				if (net.at(iface).ipv4.empty() and net.at(iface).ipv6.empty())
 					net.at(iface).ipv4 = readfile("/sys/class/net/" + iface + "/address");
 
@@ -2432,6 +2434,11 @@ namespace Net {
 					bandwidth.push_back(saved_stat.speed);
 					while (cmp_greater(bandwidth.size(), width * 2)) bandwidth.pop_front();
 
+					// Keep raw rates so rescaling cannot distort old samples.
+					// A new interface or disconnected link leaves a gap.
+					if (net.at(iface).connected and not net.at(iface).history.empty())
+						sample.rates[dir == "download" ? 0 : 1] = saved_stat.speed;
+
 					//? Set counters for auto scaling
 					if (net_auto and selected_iface == iface) {
 						if (net_sync and saved_stat.speed < net.at(iface).stat.at(dir == "download" ? "upload" : "download").speed) continue;
@@ -2446,6 +2453,8 @@ namespace Net {
 
 					}
 				}
+				net.at(iface).history.push_back(sample);
+				while (net.at(iface).history.size() > static_cast<size_t>(max(300, width * 2))) net.at(iface).history.pop_front();
 			}
 
 			//? Clean up net map if needed

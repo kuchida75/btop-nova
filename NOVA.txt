@@ -1,3 +1,18 @@
+Disk panel readability (io20):
+Read/write text and used-byte values now have dedicated bright colour roles.
+The Default theme uses light lavender, pink and rose. Existing graph gradients,
+capacity-health colours and other panels retain their palettes. Nova keeps its
+current cyan/blue text, and older themes inherit their brighter gradient stops.
+
+Network dot history (io20, Linux):
+Download and upload now share one upward dot chart with distinct colours,
+matching the CPU/GPU histories. Each series retains its own labelled byte/s
+scale; auto/sync/fixed settings and existing totals/interface/reset controls
+remain. Time labels follow measured sample timestamps. TTY uses ASCII dots;
+very small panels retain the earlier graph. Options > NET > net_dot_graph
+selects the new chart or earlier style. Enabled by default; existing Wi-Fi,
+CPU/GPU height, watts, and other preferences are preserved.
+
 GPU board wattage and roomier history (io19):
 The GPU dot chart adds an amber PWR trace from successful NVIDIA NVML power
 samples, with a labelled watt scale. The scale is at least the driver power

@@ -58,6 +58,7 @@ if not re.search(r'^nova_layout\s*=',config_text,flags=re.M):
         line=f'{key} = False'
         config_text=re.sub(r'^'+key+r'\s*=.*$',line,config_text,flags=re.M) if re.search(r'^'+key+r'\s*=',config_text,flags=re.M) else config_text+'\n'+line+'\n'
 new_preferences = {
+    'net_dot_graph': ('True', 'Upward coloured download/upload history; small panels use the earlier graph.'),
     'show_core_freq': ('False', 'Optional per-thread MHz in three columns; Shift+F toggles.'),
     'show_cpu_power': ('False', 'Optional CPU package watts and upward CPU/power history; needs readable RAPL counters.'),
     'show_zram': ('True', 'Zram compression, actual RAM cost and net savings; Shift+Z toggles.'),

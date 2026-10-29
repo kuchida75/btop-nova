@@ -1587,8 +1587,8 @@ namespace Mem {
 						if (disks_io_h <= 3) out += Mv::to(y+1+cy, x+1+cx) + string(5, ' ') + Mv::to(y+cy + disks_io_h, x+1+cx) + string(5, ' ');
 						out += Mv::to(y+1+cy, x+1+cx) + io_graphs.at(mount + "_read")(disk.io_read, redraw or data_same) + Mv::l(disks_width)
 							+ Mv::d(1) + io_graphs.at(mount + "_write")(disk.io_write, redraw or data_same)
-							+ Mv::to(y+1+cy, x+1+cx) + Theme::c("download_start") + human_read
-							+ Mv::to(y+cy + disks_io_h, x+1+cx) + Theme::c("upload_start") + human_write + Theme::c("main_fg");
+							+ Mv::to(y+1+cy, x+1+cx) + Theme::c("disk_read") + human_read
+							+ Mv::to(y+cy + disks_io_h, x+1+cx) + Theme::c("disk_write") + human_write + Theme::c("main_fg");
 						cy += disks_io_h;
 					}
 				}
@@ -1611,7 +1611,7 @@ namespace Mem {
 					const string used = floating_humanizer(disk.used, not big_disk);
 					out += Mv::to(y+1+cy++, x+1+cx)
 						+ NovaColor::capacity(disk.used_percent) + ljust("Used " + to_string(disk.used_percent) + "%", max(1, disks_width - (int)used.size() - 1))
-						+ ' ' + Theme::c("used_start") + used + Theme::c("main_fg");
+						+ ' ' + Theme::c("disk_used") + used + Theme::c("main_fg");
 					const auto rate_label = [&](char direction, double rate) {
 						if (not disk.throughput_valid) return fmt::format("{} -- MiB/s", direction);
 						string label = fmt::format("{} {:.1f} MiB/s", direction, rate);
@@ -1638,7 +1638,7 @@ namespace Mem {
 						// Clear every cell because zero graph samples use cursor movement.
 						for (int row = 0; row < history_height; ++row)
 							out += Mv::to(y+1+cy+row, x+1+cx) + string(disks_width, ' ');
-						out += Mv::to(y+1+cy, x+1+cx) + Theme::c(color + "_start") + ljust(label, label_width);
+						out += Mv::to(y+1+cy, x+1+cx) + Theme::c(color == "download" ? "disk_read" : "disk_write") + ljust(label, label_width);
 						if (not data.empty()) {
 							Draw::Graph history{history_width, history_height, color, data, graph_symbol, false, false, scale};
 							out += Mv::to(y+1+cy, x+2+cx+label_width) + history() + Theme::c("main_fg");
@@ -1669,6 +1669,51 @@ namespace Net {
 	std::unordered_map<string, Draw::Graph> graphs;
 	string box;
 
+	string history_chart(const net_info& net, int left, int top, int columns, int rows, long long download, long long upload, bool tty) {
+		const int plot_width = columns - 4, plot_height = rows - 3;
+		const int visible = GpuHistory::visible_samples(net.history.size(), plot_width, not tty);
+		const auto scales = NetHistory::scales(net.history, visible, download, upload, Config::getB("net_auto"), Config::getB("net_sync"));
+		const auto history = NetHistory::normalize(net.history, visible, scales[0], scales[1]);
+		const auto latest = net.history.back().rates;
+		const int half = columns / 2;
+		string out;
+		for (int row = 0; row < rows; ++row) out += Mv::to(top + row, left) + string(columns, ' ');
+		for (int direction = 0; direction < 2; ++direction) {
+			const int column = direction == 0 ? left : left + half;
+			const int span = direction == 0 ? half : columns - half;
+			const auto maximum = scales[direction];
+			const auto rate = latest[direction];
+			const string speed = rate < 0 ? "--" : floating_humanizer(rate, false, 0, false, true);
+			out += Mv::to(top, column) + NovaColor::color(direction) + Fx::b
+				+ uresize((direction == 0 ? "DL " : "UL ") + speed, span) + Fx::ub;
+			out += Mv::to(top + 1, column) + NovaColor::color(direction)
+				+ uresize("0-" + floating_humanizer(maximum, false, 0, false, true), span);
+		}
+		const auto pixels = GpuHistory::raster(history, plot_width, plot_height, not tty);
+		for (int row = 0; row < plot_height; ++row) {
+			out += Mv::to(top + 2 + row, left) + Theme::c("main_fg")
+				+ rjust(row == 0 ? "100" : row == plot_height - 1 ? "0" : row == (plot_height - 1) / 2 ? "50" : "", 3)
+				+ Theme::c("div_line") + (tty ? "|" : "│");
+			for (int col = 0; col < plot_width; ++col) {
+				const auto& pixel = pixels[row * plot_width + col];
+				if (pixel.series) {
+					out += NovaColor::color(pixel.series & 2 ? 1 : 0);
+					if (tty) out += '.';
+					else {
+						const unsigned code = 0x2800 + pixel.dots;
+						out += static_cast<char>(0xe0 | (code >> 12));
+						out += static_cast<char>(0x80 | ((code >> 6) & 0x3f));
+						out += static_cast<char>(0x80 | (code & 0x3f));
+					}
+				} else out += Theme::c("inactive_fg") + (row == plot_height - 1 ? (tty ? "." : "·") : " ");
+			}
+		}
+		out += Mv::to(top + rows - 1, left + 4) + Theme::c("main_fg")
+			+ uresize(fmt::format("-{:.1f}s", NetHistory::duration(history)), columns - 7)
+			+ Mv::to(top + rows - 1, left + columns - 2) + "0s";
+		return out;
+	}
+
 	string draw(const net_info& net, bool force_redraw, bool data_same) {
 		if (Runner::stopping) return "";
 		if (force_redraw) redraw = true;
@@ -1688,6 +1733,9 @@ namespace Net {
 		const int i_size = min((int)selected_iface.size(), 10);
 		const long long down_max = (net_auto ? safeVal(graph_max, "download"s) : ((long long)(Config::getI("net_download")) << 20) / 8);
 		const long long up_max = (net_auto ? safeVal(graph_max, "upload"s) : ((long long)(Config::getI("net_upload")) << 20) / 8);
+
+		const int chart_width = width - b_width - 2;
+		const bool dot_chart = Config::getB("net_dot_graph") and chart_width >= 24 and height >= 8 and not net.history.empty();
 
 		//* Redraw elements not needed to be updated every cycle
 		if (redraw) {
@@ -1730,9 +1778,13 @@ namespace Net {
 		}
 
 		//? Graphs and stats
+		if (dot_chart) {
+			const bool ascii = tty_mode or graph_symbol == "tty" or (graph_symbol == "default" and Config::getS("graph_symbol") == "tty");
+			out += history_chart(net, x + 1, y + 1, chart_width, height - 2, down_max, up_max, ascii);
+		}
 		int cy = 0;
 		for (const string dir : {"download", "upload"}) {
-			out += Mv::to(y+1 + (dir == "upload" ? u_graph_height : 0), x + 1) + graphs.at(dir)(safeVal(net.bandwidth, dir), redraw or data_same or not net.connected)
+			if (not dot_chart) out += Mv::to(y+1 + (dir == "upload" ? u_graph_height : 0), x + 1) + graphs.at(dir)(safeVal(net.bandwidth, dir), redraw or data_same or not net.connected)
 				+ Mv::to(y+1 + (dir == "upload" ? height - 3: 0), x + 1) + Fx::ub + Theme::c("graph_text")
 				+ floating_humanizer((dir == "upload" ? up_max : down_max), true);
 			const string speed = floating_humanizer(safeVal(net.stat, dir).speed, false, 0, false, true);
@@ -2712,7 +2764,8 @@ namespace Draw {
 			x = (proc_left and Proc::shown) ? Term::width - width + 1 : 1;
 			y = mem_below_net and Mem::shown ? body_y : body_y + Mem::height;
 
-			b_width = (width > 45) ? 27 : 19;
+			// Keep room for the dot chart before adding the optional bit-rate column.
+			b_width = (width > 55) ? 27 : 19;
 			b_height = (height > 10) ? 9 : height - 2;
 			b_x = x + width - b_width - 1;
 			b_y = y + ((height - 2) / 2) - b_height / 2 + 1;

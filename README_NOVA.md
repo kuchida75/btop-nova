@@ -1,7 +1,7 @@
 # Nova btop
 
 A Linux fork of [aristocratos/btop](https://github.com/aristocratos/btop), based
-on upstream v1.3.0. Current Nova version: **1.3.0-nova-io19**.
+on upstream v1.3.0. Current Nova version: **1.3.0-nova-io20**.
 
 ## AI disclosure and release privacy
 
@@ -49,6 +49,15 @@ CPU graph choices and other display preferences.
 
 ## Added displays
 
+- An upward network dot history with separate download/upload colours, matching
+  the CPU/GPU style. **Options → NET → net_dot_graph** switches back to the
+  earlier graph. Auto scaling, synchronized or independent scales, fixed speed
+  settings, interface selection, totals and reset controls are retained. Each
+  curve has a labelled byte/s scale; the vertical axis is percent of that scale.
+  Auto mode includes visible peaks so bursts remain within the plot.
+  The time label uses actual sample timestamps. Compact panels keep the earlier
+  view, and TTY mode uses ASCII dots. Default is enabled.
+
 - Optional CPU package watts and an upward CPU/power dot history via
   **Options → CPU → show_cpu_power**. CPU load uses 0–100%; watts use a labelled
   scale in steps of 50 W. Narrow views keep the regular CPU history and numeric
@@ -78,6 +87,8 @@ CPU graph choices and other display preferences.
   of the width, bounded to 41–52 columns so small windows retain readable values.
 - Mounted disks retain capacity/usage alongside live read and write MiB/s and
   separate histories. Rates use measured elapsed time between kernel samples.
+  Disk labels and used-byte values have separate bright text colours; changing
+  their readability keeps graph gradients and other panels unchanged.
 - A persistent GPU panel with five coloured Braille dot curves: GPU load,
   allocated VRAM, graphics clock, memory clock and board power. The amber
   **PWR** trace has a labelled watt scale, at least the driver power limit,
@@ -125,8 +136,8 @@ sha256sum --ignore-missing -c SHA256SUMS
 ### Portable user installation (recommended on the existing Nova host)
 
 ```sh
-tar -xzf btop-nova-1.3.0-nova-io19-linux-amd64.tar.gz
-cd btop-nova-1.3.0-nova-io19-linux-amd64
+tar -xzf btop-nova-1.3.0-nova-io20-linux-amd64.tar.gz
+cd btop-nova-1.3.0-nova-io20-linux-amd64
 python3 install_nova.py
 ~/.local/bin/btop
 ```
@@ -152,7 +163,7 @@ Bash session. `/usr/bin/btop` remains available throughout.
 ### Ubuntu/Debian package
 
 ```sh
-sudo apt install ./btop-nova_1.3.0+nova.io19-1_amd64.deb
+sudo apt install ./btop-nova_1.3.0+nova.io20-1_amd64.deb
 btop-nova
 ```
 

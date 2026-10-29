@@ -4,7 +4,7 @@ root = pathlib.Path(__file__).resolve().parent
 installed_config = pathlib.Path.home()/'.local/share/btop-nova/config/btop/btop.conf'
 old = (root/'packaging/default.conf').read_text()
 # Recreate an older profile even after the user's real installation is upgraded.
-old = re.sub(r'^(nova_layout|show_zram|show_cpu_power)\s*=.*\n?', '', old, flags=re.M)
+old = re.sub(r'^(nova_layout|show_zram|show_cpu_power|net_dot_graph)\s*=.*\n?', '', old, flags=re.M)
 old += '\ncpu_logical_graphs = True\n'
 old = re.sub(r'^color_theme = .*$', 'color_theme = "Default"', old, flags=re.M)
 for key in ('show_swap', 'swap_disk'):
@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-install-', dir=root) as tmp:
         output = subprocess.check_output([sys.executable, str(root/'install_nova.py'), '--prefix', str(prefix), '--bashrc', str(bashrc), *options], text=True)
         return json.loads(output)
     manifest = install()
-    assert manifest['version'] == '1.3.0-nova-io19', manifest
+    assert manifest['version'] == '1.3.0-nova-io20', manifest
     new = values(conf.read_text()); original = values(old)
     for key, value in original.items():
         if key == 'cpu_logical_graphs': continue
@@ -31,9 +31,10 @@ with tempfile.TemporaryDirectory(prefix='.nova-install-', dir=root) as tmp:
     assert new['nova_layout'] == 'True' and new['show_zram'] == 'True'
     assert new['show_core_freq'] == 'False'
     assert new['show_cpu_power'] == 'False'
+    assert new['net_dot_graph'] == 'True'
     assert 'cpu_logical_graphs' not in new
     command = prefix/'bin/btop'
-    assert '1.3.0-nova-io19' in subprocess.check_output([str(command), '--version'], text=True)
+    assert '1.3.0-nova-io20' in subprocess.check_output([str(command), '--version'], text=True)
     assert values(conf.read_text())['io_mode'] == 'False'
     shell_hash = digest(bashrc)
     release = pathlib.Path(manifest['release'])/'bin/btop'
@@ -41,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='.nova-install-', dir=root) as tmp:
     # A future upgrade must preserve a deliberately restored swap view and
     # disabled custom layout. Existing GPU and mount preferences also persist.
     text = conf.read_text()
-    for key, value in {'show_swap':'True', 'swap_disk':'True', 'nova_layout':'False', 'proc_mounts':'False', 'gpu_processes':'False', 'show_zram':'False', 'show_core_freq':'True', 'show_cpu_power':'True'}.items():
+    for key, value in {'show_swap':'True', 'swap_disk':'True', 'nova_layout':'False', 'proc_mounts':'False', 'gpu_processes':'False', 'show_zram':'False', 'show_core_freq':'True', 'show_cpu_power':'True', 'net_dot_graph':'False'}.items():
         text = re.sub(r'^'+key+r'\s*=.*$', key+' = '+value, text, flags=re.M)
     conf.write_text(text)
     install()
